@@ -17,6 +17,7 @@
 
 #include "object_detector.h"
 #include "custom_package.h"
+#include <thread>
 namespace GryFlux
 {
     std::shared_ptr<DataObject> ObjectDetector::process(const std::vector<std::shared_ptr<DataObject>> &inputs)
@@ -25,13 +26,20 @@ namespace GryFlux
             return nullptr;
 
         auto input_data = std::dynamic_pointer_cast<CustomPackage>(inputs[0]);
-      
-        for (int i = 0; i < 10; i++)
+
+        std::vector<int> data;
+        input_data->get_data(data);
+
+        // 在原有input数据的基础上添加1000-2000
+        auto result = std::make_shared<CustomPackage>();
+        for (auto i : data) result->push_data(i);
+        for (int i = 0; i < 1000; i++)
         {
             /* code */
-            input_data->push_data(i);
+            result->push_data(i+1000);
         }
 
-        return input_data;
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        return result;
     }
 }

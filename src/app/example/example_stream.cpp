@@ -72,7 +72,7 @@ void buildStreamingComputeGraph(std::shared_ptr<GryFlux::PipelineBuilder> builde
 
 void initLogger()
 {
-    LOG.setLevel(GryFlux::LogLevel::INFO);
+    LOG.setLevel(GryFlux::LogLevel::DEBUG);
     LOG.setOutputType(GryFlux::LogOutputType::BOTH);
     LOG.setAppName("StreamingExample");
     //  如果logs目录不存在，创建logs目录

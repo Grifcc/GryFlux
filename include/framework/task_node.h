@@ -58,7 +58,7 @@ namespace GryFlux
         TaskId id_;
         std::vector<std::shared_ptr<TaskNode>> dependencies_;
         std::shared_ptr<DataObject> result_;
-        std::atomic<bool> executed_;
+        bool executed_;
 
         // 任务执行时间记录
         std::chrono::time_point<std::chrono::high_resolution_clock> startTime_;

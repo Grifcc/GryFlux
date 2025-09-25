@@ -33,8 +33,13 @@ namespace GryFlux
                 auto result = std::dynamic_pointer_cast<CustomPackage>(output);
                 if (result)
                 {
+                    std::vector<int> data;
+                    result->get_data(data);
+                    for (auto &i : data)
+                    {
+                        LOG.info("Frame %d processed, data: %d", processedFrames, i);
+                    }
                     processedFrames++;
-                    LOG.info("Frame %d processed", processedFrames);
                 }
             }
             else

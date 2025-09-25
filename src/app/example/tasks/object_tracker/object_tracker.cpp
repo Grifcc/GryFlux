@@ -31,8 +31,10 @@ namespace GryFlux
         // 默认输出为第一个输入，所有结果向第一个输入合并
         auto result = std::dynamic_pointer_cast<CustomPackage>(inputs[0]);
         // 添加处理逻辑
+        std::vector<int> input_data;
+        feature_res->get_data(input_data);
 
-        for (size_t i = 0; i < 6; i++)
+        for (auto i : input_data)
         {
             /* code */
             result->push_data(i);
