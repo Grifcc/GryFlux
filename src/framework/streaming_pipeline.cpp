@@ -63,6 +63,7 @@ namespace GryFlux
         {
             std::lock_guard<std::mutex> lock(statsMutex_);
             taskStats_.clear();
+            totalProcessingTime_ = 0.0;
         }
 
         startTime_ = std::chrono::high_resolution_clock::now();
@@ -71,7 +72,7 @@ namespace GryFlux
         input_active_ = true;
         output_active_ = true;
  
-        builderPool_ = std::make_unique<PipelineBuilderPool>(instancePoolSize_);
+        builderPool_ = std::make_unique<PipelineBuilderPool>(instancePoolSize_, workerCount_);
         initializeInstancePool();
         launchWorkers();
 
@@ -113,9 +114,15 @@ namespace GryFlux
 
             if (processedItems_ > 0)
             {
-                double avgTime = static_cast<double>(totalProcessingTime_) / processedItems_;
-                LOG.info("  - Average processing time per item: %.3f ms", avgTime);
+                const double avgEndToEndTime = totalTime / processedItems_;
+                LOG.info("  - Average end-to-end time per item: %.3f ms", avgEndToEndTime);
                 LOG.info("  - Processing rate: %.2f items/s", (processedItems_ * 1000.0 / totalTime));
+
+                if (totalProcessingTime_ > 0.0)
+                {
+                    const double avgWorkerProcessingTime = totalProcessingTime_ / processedItems_;
+                    LOG.info("  - Average worker processing time per item: %.3f ms", avgWorkerProcessingTime);
+                }
             }
 
             // 输出同名任务的全局平均执行时间

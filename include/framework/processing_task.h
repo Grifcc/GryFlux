@@ -16,10 +16,13 @@
  *************************************************************************************************************************/
 #pragma once
 
-#include <memory>
-#include <vector>
 #include <functional>
+#include <memory>
 #include <stdexcept>
+#include <tuple>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 #include "data_object.h"
 
 namespace GryFlux
@@ -59,29 +62,56 @@ namespace GryFlux
     class TaskRegistry
     {
     private:
-        std::unordered_map<std::string, std::shared_ptr<ProcessingTask>> tasks;
+        using TaskFactory = std::function<std::shared_ptr<ProcessingTask>()>;
+        std::unordered_map<std::string, TaskFactory> taskFactories_;
 
     public:
         // 注册任务并返回任务ID
         template <typename T, typename... Args>
         std::string registerTask(const std::string &taskId, Args &&...args)
         {
-            tasks[taskId] = std::make_shared<T>(std::forward<Args>(args)...);
+            auto argsTuple = std::make_tuple(std::forward<Args>(args)...);
+
+            taskFactories_[taskId] = [argsTuple]() mutable -> std::shared_ptr<ProcessingTask>
+            {
+                return std::apply(
+                    [](auto &&...unpackedArgs) -> std::shared_ptr<ProcessingTask>
+                    {
+                        return std::make_shared<T>(std::forward<decltype(unpackedArgs)>(unpackedArgs)...);
+                    },
+                    argsTuple);
+            };
+
             return taskId;
         }
 
         // 获取任务处理函数
-        std::function<std::shared_ptr<DataObject>(const std::vector<std::shared_ptr<DataObject>> &)>
-        getProcessFunction(const std::string &taskId)
+        std::function<std::shared_ptr<DataObject>(const std::vector<std::shared_ptr<DataObject>> &)> getProcessFunction(const std::string &taskId)
         {
-            if (tasks.find(taskId) == tasks.end())
+            auto it = taskFactories_.find(taskId);
+            if (it == taskFactories_.end())
             {
                 throw std::runtime_error("Task not found: " + taskId);
             }
 
-            return [task = tasks[taskId]](const std::vector<std::shared_ptr<DataObject>> &inputs)
+            auto factory = it->second;
+
+            return [factory, taskId](const std::vector<std::shared_ptr<DataObject>> &inputs)
             {
-                return task->process(inputs);
+                thread_local std::unordered_map<std::string, std::shared_ptr<ProcessingTask>> localTaskCache;
+
+                auto instanceIt = localTaskCache.find(taskId);
+                if (instanceIt == localTaskCache.end())
+                {
+                    auto instance = factory();
+                    if (!instance)
+                    {
+                        throw std::runtime_error("Failed to create task instance: " + taskId);
+                    }
+                    instanceIt = localTaskCache.emplace(taskId, std::move(instance)).first;
+                }
+
+                return instanceIt->second->process(inputs);
             };
         }
     };
