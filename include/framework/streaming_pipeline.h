@@ -16,16 +16,22 @@
  *************************************************************************************************************************/
 #pragma once
 
+#include <atomic>
+#include <cstdint>
+#include <chrono>
+#include <condition_variable>
+#include <functional>
+#include <deque>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
-#include <atomic>
-#include <functional>
 #include <unordered_map>
-#include <chrono>
+#include <vector>
+
 #include "framework/pipeline_builder.h"
-#include "framework/thread_pool.h"
-#include "framework/task_scheduler.h"
+#include "framework/pipeline_builder_pool.h"
+#include "framework/pipeline_instance.h"
 #include "utils/threadsafe_queue.h"
 
 namespace GryFlux
@@ -39,7 +45,7 @@ namespace GryFlux
                                                      std::shared_ptr<DataObject>,
                                                      const std::string &)>;
 
-        StreamingPipeline(size_t numThreads = 0,
+        StreamingPipeline(size_t workerCount = 0,
                           size_t queueSize = 100);
         ~StreamingPipeline();
 
@@ -98,9 +104,15 @@ namespace GryFlux
         bool isProfilingEnabled() const { return profilingEnabled_; }
 
     private:
-        void processingLoop();
+        void processingLoop(size_t workerIndex);
+        void launchWorkers();
+        void joinWorkers();
 
-        std::shared_ptr<PipelineBuilder> pipelineBuilder_; // 新增：用于重用PipelineBuilder对象
+        // 对象池相关方法
+        void initializeInstancePool();
+        void clearInstancePool();
+        std::shared_ptr<PipelineInstance> acquireInstance();
+        void releaseInstance(const std::shared_ptr<PipelineInstance> &instance);
 
         using DataObjectQueue = std::shared_ptr<threadsafe_queue<std::shared_ptr<DataObject>>>;
         DataObjectQueue inputQueue_;
@@ -113,6 +125,19 @@ namespace GryFlux
         std::thread processingThread_;
         std::atomic<bool> running_;
         size_t queueMaxSize_;
+        size_t workerCount_;
+        size_t instancePoolSize_;
+
+        std::vector<std::thread> processingWorkers_;
+
+        mutable std::mutex statsMutex_;
+
+        std::vector<std::shared_ptr<PipelineInstance>> instancePool_;
+        std::deque<std::shared_ptr<PipelineInstance>> instanceFreeList_;
+        mutable std::mutex instanceMutex_;
+        std::condition_variable instanceCv_;
+
+        std::unique_ptr<PipelineBuilderPool> builderPool_;
 
         // 统计信息
         std::atomic<size_t> processedItems_;

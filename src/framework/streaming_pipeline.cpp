@@ -16,26 +16,28 @@
  *************************************************************************************************************************/
 #include "framework/streaming_pipeline.h"
 #include "utils/logger.h"
-#include <iostream>
-#include <chrono>
 #include <algorithm>
-#include <iomanip>
-#include <sstream>
+#include <chrono>
+#include <stdexcept>
+#include <thread>
 #include <unordered_map>
+#include <utility>
+#include <cmath>
 
 namespace GryFlux
 {
 
-    StreamingPipeline::StreamingPipeline(size_t numThreads, size_t queueSize)
-        : pipelineBuilder_(std::make_shared<PipelineBuilder>(numThreads > 0 ? numThreads : std::thread::hardware_concurrency())),
-          inputQueue_(std::make_shared<threadsafe_queue<std::shared_ptr<DataObject>>>()),
+    StreamingPipeline::StreamingPipeline(size_t workerCount, size_t queueSize)
+        : inputQueue_(std::make_shared<threadsafe_queue<std::shared_ptr<DataObject>>>()),
           outputQueue_(std::make_shared<threadsafe_queue<std::shared_ptr<DataObject>>>()),
-          outputNodeId_("output"),
+        outputNodeId_("output"),
           running_(false),
           queueMaxSize_(queueSize),
+          workerCount_(workerCount > 0 ? workerCount : 1),
+          instancePoolSize_(workerCount_),
           processedItems_(0),
           errorCount_(0),
-          totalProcessingTime_(0),
+          totalProcessingTime_(0.0),
           profilingEnabled_(false) {}
 
     StreamingPipeline::~StreamingPipeline()
@@ -45,7 +47,7 @@ namespace GryFlux
 
     void StreamingPipeline::start()
     {
-        if (running_)
+        if (running_.load())
         {
             return;
         }
@@ -56,39 +58,47 @@ namespace GryFlux
         }
 
         // 重置统计数据
-        processedItems_ = 0;
-        errorCount_ = 0;
-        totalProcessingTime_ = 0;
-        taskStats_.clear(); // 重置任务统计数据
+        processedItems_.store(0);
+        errorCount_.store(0);
+        {
+            std::lock_guard<std::mutex> lock(statsMutex_);
+            taskStats_.clear();
+        }
+
         startTime_ = std::chrono::high_resolution_clock::now();
 
         running_ = true;
         input_active_ = true;
         output_active_ = true;
-        processingThread_ = std::thread(&StreamingPipeline::processingLoop, this);
+ 
+        builderPool_ = std::make_unique<PipelineBuilderPool>(instancePoolSize_);
+        initializeInstancePool();
+        launchWorkers();
 
-        LOG.debug("[Pipeline] Started streaming pipeline");
+        LOG.debug("[Pipeline] Started streaming pipeline with %zu workers", workerCount_);
     }
 
     void StreamingPipeline::stop()
     {
-        if (!running_)
+        if (!running_.exchange(false))
         {
             return;
         }
 
-        running_ = false;
         input_active_ = false;
 
-        if (processingThread_.joinable())
-        {
-            processingThread_.join();
-        }
+        instanceCv_.notify_all();
+        joinWorkers();
 
         output_active_ = false;
 
-        // 清理PipelineBuilder对象
-        pipelineBuilder_.reset();
+        clearInstancePool();
+
+        if (builderPool_)
+        {
+            builderPool_->shutdown();
+            builderPool_.reset();
+        }
 
         // 只有在启用性能分析时才输出统计数据
         if (profilingEnabled_)
@@ -132,32 +142,35 @@ namespace GryFlux
 
     void StreamingPipeline::setProcessor(ProcessorFunction processor)
     {
-        if (running_)
+        if (running_.load())
         {
             throw std::runtime_error("Cannot set processor while pipeline is running");
         }
-        processor_ = processor;
+        processor_ = std::move(processor);
     }
 
     bool StreamingPipeline::addInput(std::shared_ptr<DataObject> data)
     {
-        if (!data)
+        if (!data || !input_active_.load())
         {
             return false;
         }
 
-        // 避免队列过大时的内存占用问题
-        while (inputQueue_->size() >= queueMaxSize_ && input_active_.load())
+        if (queueMaxSize_ > 0)
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            while (input_active_.load() && static_cast<size_t>(inputQueue_->size()) >= queueMaxSize_)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
         }
 
-        if (input_active_.load())
+        if (!input_active_.load())
         {
-            inputQueue_->push(data);
-            return true;
+            return false;
         }
-        return false;
+
+        inputQueue_->push(std::move(data));
+        return true;
     }
 
     bool StreamingPipeline::tryGetOutput(std::shared_ptr<DataObject> &output)
@@ -172,7 +185,7 @@ namespace GryFlux
 
     void StreamingPipeline::setOutputNodeId(const std::string &outputId)
     {
-        if (running_)
+        if (running_.load())
         {
             throw std::runtime_error("Cannot set output node ID while pipeline is running");
         }
@@ -191,105 +204,202 @@ namespace GryFlux
 
     size_t StreamingPipeline::inputSize() const
     {
-        return inputQueue_->size();
+        return static_cast<size_t>(inputQueue_->size());
     }
 
     size_t StreamingPipeline::outputSize() const
     {
-        return outputQueue_->size();
+        return static_cast<size_t>(outputQueue_->size());
     }
 
     size_t StreamingPipeline::getProcessedItemCount() const
     {
-        return processedItems_;
+        return processedItems_.load();
     }
-
+    
     size_t StreamingPipeline::getErrorCount() const
     {
-        return errorCount_;
+        return errorCount_.load();
     }
 
     bool StreamingPipeline::isRunning() const
     {
-        return running_;
+        return running_.load();
     }
 
-    void StreamingPipeline::processingLoop()
+    void StreamingPipeline::launchWorkers()
     {
-        while (running_ || !inputQueue_->empty())
+        processingWorkers_.clear();
+        processingWorkers_.reserve(workerCount_);
+        for (size_t i = 0; i < workerCount_; ++i)
         {
-            std::shared_ptr<DataObject> input;
-            if (inputQueue_->try_pop(input)) // 非阻塞获取输入
+            processingWorkers_.emplace_back(&StreamingPipeline::processingLoop, this, i);
+        }
+    }
+
+    void StreamingPipeline::joinWorkers()
+    {
+        for (auto &worker : processingWorkers_)
+        {
+            if (worker.joinable())
             {
-                // 只有在启用性能分析时才测量时间
-                std::chrono::time_point<std::chrono::high_resolution_clock> startProcess;
-                if (profilingEnabled_)
-                {
-                    startProcess = std::chrono::high_resolution_clock::now();
-                }
-
-                try
-                {
-                    // 使用用户定义的处理器构建和执行管道
-                    processor_(pipelineBuilder_, input, outputNodeId_);
-
-                    // 只有在启用性能分析时才收集任务统计信息
-                    if (profilingEnabled_)
-                    {
-                        auto result = pipelineBuilder_->execute(outputNodeId_);
-
-                        // 收集同名任务的执行时间统计
-                        auto taskTimes = pipelineBuilder_->getScheduler()->getTaskExecutionTimes();
-                        for (const auto &taskTime : taskTimes)
-                        {
-                            const std::string &taskName = taskTime.first;
-                            double executionTime = taskTime.second;
-
-                            // 累加到同名任务的统计中
-                            taskStats_[taskName].first += executionTime;
-                            taskStats_[taskName].second++;
-                        }
-
-                        // 处理结果
-                        if (result)
-                        {
-                            outputQueue_->push(result);
-                            processedItems_++;
-                        }
-
-                        // 计算处理时间
-                        auto endProcess = std::chrono::high_resolution_clock::now();
-                        auto duration = std::chrono::duration<double, std::milli>(endProcess - startProcess).count();
-                        totalProcessingTime_ += duration;
-
-                        LOG.debug("[Pipeline] Processed item %zu in %.3f ms", processedItems_, duration);
-                    }
-                    else
-                    {
-                        // 在不启用性能分析时，直接执行管道并处理结果
-                        auto result = pipelineBuilder_->execute(outputNodeId_);
-                        if (result)
-                        {
-                            outputQueue_->push(result);
-                            processedItems_++;
-                        }
-                    }
-                }
-                catch (const std::exception &e)
-                {
-                    errorCount_++;
-                    LOG.error("[Pipeline] Error processing input: %s", e.what());
-                }
-                catch (...)
-                {
-                    errorCount_++;
-                    LOG.error("[Pipeline] Unknown error processing input");
-                }
+                worker.join();
             }
         }
+        processingWorkers_.clear();
+    }
 
-        // 处理完所有输入后，关闭输出队列
-        output_active_ = false;
+    void StreamingPipeline::initializeInstancePool()
+    {
+        std::lock_guard<std::mutex> lock(instanceMutex_);
+        instancePool_.clear();
+        instanceFreeList_.clear();
+        instancePool_.reserve(instancePoolSize_);
+        for (size_t i = 0; i < instancePoolSize_; ++i)
+        {
+            auto instance = std::make_shared<PipelineInstance>(builderPool_.get());
+            instancePool_.push_back(instance);
+            instanceFreeList_.push_back(std::move(instance));
+        }
+    }
+
+    void StreamingPipeline::clearInstancePool()
+    {
+        std::lock_guard<std::mutex> lock(instanceMutex_);
+        for (auto &instance : instancePool_)
+        {
+            if (instance)
+            {
+                instance->reset();
+            }
+        }
+        instancePool_.clear();
+        instanceFreeList_.clear();
+    }
+
+    std::shared_ptr<PipelineInstance> StreamingPipeline::acquireInstance()
+    {
+        std::unique_lock<std::mutex> lock(instanceMutex_);
+        instanceCv_.wait(lock, [this]
+                         { return !instanceFreeList_.empty() || !running_.load(); });
+
+        if (instanceFreeList_.empty())
+        {
+            return nullptr;
+        }
+
+        auto instance = instanceFreeList_.front();
+        instanceFreeList_.pop_front();
+        return instance;
+    }
+
+    void StreamingPipeline::releaseInstance(const std::shared_ptr<PipelineInstance> &instance)
+    {
+        if (!instance)
+        {
+            return;
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(instanceMutex_);
+            instanceFreeList_.push_back(instance);
+        }
+        instanceCv_.notify_one();
+    }
+
+    void StreamingPipeline::processingLoop(size_t workerIndex)
+    {
+        while (running_.load() || !inputQueue_->empty())
+        {
+            std::shared_ptr<DataObject> input;
+            if (!inputQueue_->try_pop(input))
+            {
+                if (!running_.load())
+                {
+                    break;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                continue;
+            }
+
+            if (!input)
+            {
+                continue;
+            }
+
+            auto instance = acquireInstance();
+            if (!instance)
+            {
+                break;
+            }
+
+            std::chrono::time_point<std::chrono::high_resolution_clock> frameStart;
+            if (profilingEnabled_)
+            {
+                frameStart = std::chrono::high_resolution_clock::now();
+            }
+
+            std::unordered_map<std::string, double> frameTaskTimes;
+            try
+            {
+                instance->prepare(processor_, input, outputNodeId_, profilingEnabled_);
+
+                auto result = instance->execute(outputNodeId_);
+                if (result)
+                {
+                    outputQueue_->push(std::move(result));
+                    processedItems_.fetch_add(1, std::memory_order_relaxed);
+                }
+                else
+                {
+                    LOG.error("[Pipeline] Pipeline execution returned null output");
+                    errorCount_.fetch_add(1, std::memory_order_relaxed);
+                }
+
+                if (profilingEnabled_)
+                {
+                    auto scheduler = instance->getBuilder()->getScheduler();
+                    if (scheduler)
+                    {
+                        frameTaskTimes = scheduler->getTaskExecutionTimes();
+                    }
+                }
+            }
+            catch (const std::exception &ex)
+            {
+                LOG.error("[Pipeline] Execution error: %s", ex.what());
+                errorCount_.fetch_add(1, std::memory_order_relaxed);
+            }
+            catch (...)
+            {
+                LOG.error("[Pipeline] Execution error: unknown exception");
+                errorCount_.fetch_add(1, std::memory_order_relaxed);
+            }
+
+            if (profilingEnabled_)
+            {
+                const auto frameEnd = std::chrono::high_resolution_clock::now();
+                const double frameDurationMs = std::chrono::duration<double, std::milli>(frameEnd - frameStart).count();
+
+                {
+                    std::lock_guard<std::mutex> lock(statsMutex_);
+                    totalProcessingTime_ += frameDurationMs;
+                    for (const auto &entry : frameTaskTimes)
+                    {
+                        auto &stat = taskStats_[entry.first];
+                        stat.first += entry.second;
+                        stat.second += 1;
+                    }
+                }
+
+                LOG.debug("[Pipeline] Processed item %zu in %.3f ms",
+                          processedItems_.load(std::memory_order_relaxed), frameDurationMs);
+            }
+
+            instance->reset();
+            releaseInstance(instance);
+        }
+
         LOG.debug("[Pipeline] Processing loop completed");
     }
 

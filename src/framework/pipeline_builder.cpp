@@ -76,8 +76,12 @@ namespace GryFlux
 
     void PipelineBuilder::reset()
     {
-        // 创建新的调度器，丢弃旧的任务图
-        scheduler_ = std::make_shared<TaskScheduler>();
+        if (!scheduler_)
+        {
+            scheduler_ = std::make_shared<TaskScheduler>();
+            return;
+        }
+        scheduler_->clear();
     }
 
 } // namespace GryFlux
