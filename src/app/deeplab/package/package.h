@@ -55,11 +55,11 @@ public:
       return y_pad_;
     }
 private:
-  cv::Mat src_frame_;
-  int idx_;
-  float scale_;
-  int x_pad_;
-  int y_pad_;
+    cv::Mat src_frame_;
+    int idx_;
+    float scale_;
+    int x_pad_;
+    int y_pad_;
 };
 
 class RunnerPackage : public GryFlux::DataObject
@@ -102,29 +102,22 @@ private:
 
 };
 
-struct ObjectInfo
-{
-  int left;
-  int top;
-  int right;
-  int bottom;
-  int class_id;
-  float prob;
-};
 
-class ObjectPackage : public GryFlux::DataObject
+class MaskPackage : public GryFlux::DataObject
 {
 public:
-  ObjectPackage(int img_id):img_id_(img_id) {};
-  ~ObjectPackage() {};
+    MaskPackage(int img_id, const cv::Mat& mask)
+        :img_id_(img_id), mask_(mask) {};
+    ~MaskPackage() {};
 
-  std::vector<ObjectInfo> get_data() const {
-    return objects_;
-  }
-  void push_data(ObjectInfo obj_info) {
-    objects_.push_back(obj_info);
-  }
+    // mask: CV_8UC1，每个像素值为类别id
+    const cv::Mat& get_mask() const {
+        return mask_;
+    }
+    int get_img_id() const {
+        return img_id_;
+    }
 private:
-  int img_id_;
-  std::vector<ObjectInfo> objects_;
+    int img_id_;
+    cv::Mat mask_; // 分割mask
 };

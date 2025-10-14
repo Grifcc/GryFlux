@@ -82,6 +82,7 @@ namespace GryFlux {
 		input_attrs_[0].type = input_type;
 		input_attrs_[0].fmt = input_layout;
 		LOG.info("input_attrs_[0].size_with_stride:%d", input_attrs_[0].size_with_stride);
+		LOG.info("input_attrs_[0].size_with_stride:%d", input_attrs_[0].w_stride);
 		input_mems_.emplace_back(rknn_create_mem(rknn_ctx_, input_attrs_[0].size_with_stride));
 		RKNN_CHECK(rknn_set_io_mem(rknn_ctx_, input_mems_[0], &input_attrs_[0]), "set input mem");
 
@@ -138,14 +139,13 @@ namespace GryFlux {
     std::shared_ptr<DataObject> RkRunner::process(const std::vector<std::shared_ptr<DataObject>> &inputs) {
 		// single input
 		if (inputs.size() != 1) return nullptr;
-
 		//set input
         auto input_data = std::dynamic_pointer_cast<ImagePackage>(inputs[0]);
 		auto frame = input_data->get_data();
 		int height = input_data->get_height();
 		int width = input_data->get_width();
 		if (width == input_attrs_[0].w_stride) {
-		memcpy(input_mems_[0]->virt_addr, frame.data, input_mems_[0]->size);
+			memcpy(input_mems_[0]->virt_addr, frame.data, input_mems_[0]->size);
 		}
 		else {
 			uint8_t *src_ptr = frame.data;
@@ -159,6 +159,7 @@ namespace GryFlux {
 				dst_ptr += dst_wc_elem;
 			}
 		}
+		// memcpy(input_mems_[0]->virt_addr, frame.data, input_mems_[0]->size);
 		rknn_mem_sync(rknn_ctx_, input_mems_[0], RKNN_MEMORY_SYNC_TO_DEVICE);
 
 		//run inference
@@ -181,7 +182,7 @@ namespace GryFlux {
 				throw std::runtime_error("output type is not quantized, Not Implemented");
 			}	
 			// add to ouput package
-			output_data->push_data({output, output_attrs_[i].n_elems}, {output_attrs_[i].dims[2], output_attrs_[i].dims[3]});
+			output_data->push_data({output, output_attrs_[i].n_elems}, {output_attrs_[i].dims[1], output_attrs_[i].dims[2]});
 
 		}
 		return output_data;
