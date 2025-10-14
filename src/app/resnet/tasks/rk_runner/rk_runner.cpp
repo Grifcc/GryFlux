@@ -82,9 +82,6 @@ namespace GryFlux {
 		input_attrs_[0].type = input_type;
 		input_attrs_[0].fmt = input_layout;
 		LOG.info("input_attrs_[0].size_with_stride:%d", input_attrs_[0].size_with_stride);
-		LOG.info("input_attrs_[0].size:%d", input_attrs_[0].size);
-		LOG.info("input_attrs_[0].wstride:%d", input_attrs_[0].w_stride);
-		LOG.info("input_attrs_[0].hstride:%d", input_attrs_[0].h_stride);
 		input_mems_.emplace_back(rknn_create_mem(rknn_ctx_, input_attrs_[0].size_with_stride));
 		RKNN_CHECK(rknn_set_io_mem(rknn_ctx_, input_mems_[0], &input_attrs_[0]), "set input mem");
 
@@ -145,7 +142,23 @@ namespace GryFlux {
 		//set input
         auto input_data = std::dynamic_pointer_cast<ImagePackage>(inputs[0]);
 		auto frame = input_data->get_data();
+		int height = input_data->get_height();
+		int width = input_data->get_width();
+		if (width == input_attrs_[0].w_stride) {
 		memcpy(input_mems_[0]->virt_addr, frame.data, input_mems_[0]->size);
+		}
+		else {
+			uint8_t *src_ptr = frame.data;
+			uint8_t *dst_ptr = reinterpret_cast<uint8_t*>(input_mems_[0]->virt_addr);
+			int src_wc_elem = width * 3; // rgb
+			int dst_wc_elem = input_attrs_[0].w_stride * 3; // nhwc
+			// nhwc
+			for (int h = 0; h < height; h++) {
+				memcpy(dst_ptr, src_ptr, src_wc_elem);
+				src_ptr += src_wc_elem;
+				dst_ptr += dst_wc_elem;
+			}
+		}
 		rknn_mem_sync(rknn_ctx_, input_mems_[0], RKNN_MEMORY_SYNC_TO_DEVICE);
 
 		//run inference

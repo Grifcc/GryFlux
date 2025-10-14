@@ -34,7 +34,7 @@
 
 #include "source/producer/image_producer.h"
 #include "tasks/image_preprocess/image_preprocess.h"
-#include "tasks/object_detector/classifier.h"
+#include "tasks/classifier/classifier.h"
 #include "tasks/rk_runner/rk_runner.h"
 #include "tasks/res_sender/res_sender.h"
 #include "sink/write_consumer/write_consumer.h"

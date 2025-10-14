@@ -17,7 +17,7 @@ aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/source/producer APP_SRC)
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/tasks/image_preprocess APP_SRC)
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/runtime APP_SRC)
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/tasks/rk_runner APP_SRC)
-aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/tasks/object_detector APP_SRC)
+aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/tasks/classifier APP_SRC)
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/tasks/res_sender APP_SRC)
 
 add_executable(resnet_stream resnet_stream.cpp ${SRC_DIR} ${APP_SRC})
