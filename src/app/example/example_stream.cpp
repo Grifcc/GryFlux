@@ -107,8 +107,8 @@ int main(int argc, char **argv)
     taskRegistry.registerTask<GryFlux::ObjectTracker>("objectTracker", 2);
     taskRegistry.registerTask<GryFlux::ResSender>("resultSender", 2);
 
-    // 创建流式处理管道：6 个管线实例/工作线程、4 个调度线程线程、队列上限 100
-    GryFlux::StreamingPipeline pipeline(6, 4, 100);
+    // 创建流式处理管道：2 个管线实例/工作线程、4 个调度线程线程、队列上限 100
+    GryFlux::StreamingPipeline pipeline(2, 4, 100);
 
     // 启用性能分析
     pipeline.enableProfiling(true);
