@@ -16,10 +16,19 @@
  *************************************************************************************************************************/
 #pragma once
 
-#include <memory>
-#include <vector>
+#include <condition_variable>
+#include <cstddef>
+#include <deque>
 #include <functional>
+#include <memory>
+#include <mutex>
 #include <stdexcept>
+#include <tuple>
+#include <type_traits>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
 #include "data_object.h"
 
 namespace GryFlux
@@ -55,34 +64,101 @@ namespace GryFlux
             };
         }
     };
+    // 任务实例对象池，负责预先创建并复用 ProcessingTask 实例
+    class ProcessingTaskPool : public std::enable_shared_from_this<ProcessingTaskPool>
+    {
+    public:
+        using TaskPtr = std::shared_ptr<ProcessingTask>;
+        using Factory = std::function<TaskPtr()>;
+
+        ProcessingTaskPool(size_t capacity, Factory factory);
+        ~ProcessingTaskPool();
+
+        ProcessingTaskPool(const ProcessingTaskPool &) = delete;
+        ProcessingTaskPool &operator=(const ProcessingTaskPool &) = delete;
+
+        TaskPtr acquire();
+        void release(TaskPtr task);
+        void shutdown();
+
+        size_t capacity() const { return capacity_; }
+        size_t available() const;
+
+    private:
+        void initialize();
+
+        size_t capacity_;
+        Factory factory_;
+        std::vector<TaskPtr> allTasks_;
+        std::deque<TaskPtr> idleTasks_;
+
+        mutable std::mutex mutex_;
+        std::condition_variable cv_;
+        bool stopped_;
+    };
+
     // 定义任务注册表类，用于管理所有处理任务
     class TaskRegistry
     {
-    private:
-        std::unordered_map<std::string, std::shared_ptr<ProcessingTask>> tasks;
-
     public:
-        // 注册任务并返回任务ID
-        template <typename T, typename... Args>
-        std::string registerTask(const std::string &taskId, Args &&...args)
+        TaskRegistry() = default;
+        ~TaskRegistry();
+
+        TaskRegistry(const TaskRegistry &) = delete;
+        TaskRegistry &operator=(const TaskRegistry &) = delete;
+
+        // 注册任务池并返回任务ID，支持自定义实例数量
+        template <typename T>
+        std::string registerTask(const std::string &taskId)
         {
-            tasks[taskId] = std::make_shared<T>(std::forward<Args>(args)...);
-            return taskId;
+            return registerTaskWithCount<T>(taskId, 1);
+        }
+
+        template <typename T, typename First, typename... Rest>
+        std::string registerTask(const std::string &taskId, First &&first, Rest &&...rest)
+        {
+            if constexpr (std::is_integral_v<std::decay_t<First>> && !std::is_same_v<std::decay_t<First>, bool>)
+            {
+                return registerTaskWithCount<T>(taskId,
+                                                static_cast<size_t>(std::forward<First>(first)),
+                                                std::forward<Rest>(rest)...);
+            }
+            else
+            {
+                return registerTaskWithCount<T>(taskId, 1, std::forward<First>(first), std::forward<Rest>(rest)...);
+            }
         }
 
         // 获取任务处理函数
-        std::function<std::shared_ptr<DataObject>(const std::vector<std::shared_ptr<DataObject>> &)>
-        getProcessFunction(const std::string &taskId)
+        std::function<std::shared_ptr<DataObject>(const std::vector<std::shared_ptr<DataObject>> &)> getProcessFunction(const std::string &taskId);
+
+    private:
+        template <typename T, typename... Args>
+        std::string registerTaskWithCount(const std::string &taskId, size_t instanceCount, Args &&...args)
         {
-            if (tasks.find(taskId) == tasks.end())
+            if (taskPools_.find(taskId) != taskPools_.end())
             {
-                throw std::runtime_error("Task not found: " + taskId);
+                throw std::runtime_error("Task already registered: " + taskId);
             }
 
-            return [task = tasks[taskId]](const std::vector<std::shared_ptr<DataObject>> &inputs)
+            if (instanceCount == 0)
             {
-                return task->process(inputs);
+                instanceCount = 1;
+            }
+
+            auto params = std::make_shared<std::tuple<std::decay_t<Args>...>>(std::forward<Args>(args)...);
+
+            auto factory = [params]() -> std::shared_ptr<ProcessingTask>
+            {
+                return std::apply([](auto &...ctorArgs)
+                                  { return std::make_shared<T>(ctorArgs...); }, *params);
             };
+
+            auto pool = std::make_shared<ProcessingTaskPool>(instanceCount, std::move(factory));
+            taskPools_.emplace(taskId, std::move(pool));
+            return taskId;
         }
+
+        std::unordered_map<std::string, std::shared_ptr<ProcessingTaskPool>> taskPools_;
     };
 } // namespace GryFlux

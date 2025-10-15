@@ -20,8 +20,9 @@
 
 namespace GryFlux
 {
-    PipelineBuilderPool::PipelineBuilderPool(size_t capacity)
+    PipelineBuilderPool::PipelineBuilderPool(size_t capacity, size_t builderThreadCount)
         : capacity_(capacity == 0 ? 1 : capacity),
+          builderThreadCount_(builderThreadCount),
           stopped_(false)
     {
     }
@@ -44,7 +45,7 @@ namespace GryFlux
 
         if (idleBuilders_.empty() && allBuilders_.size() < capacity_)
         {
-            auto builder = std::make_shared<PipelineBuilder>();
+            auto builder = std::make_shared<PipelineBuilder>(builderThreadCount_);
             allBuilders_.push_back(builder);
             idleBuilders_.push_back(builder);
         }

@@ -46,6 +46,7 @@ namespace GryFlux
                                                      const std::string &)>;
 
         StreamingPipeline(size_t workerCount = 0,
+                          size_t schedulerThreadCount = 0,
                           size_t queueSize = 100);
         ~StreamingPipeline();
 
@@ -103,6 +104,10 @@ namespace GryFlux
         // 获取性能分析状态
         bool isProfilingEnabled() const { return profilingEnabled_; }
 
+        // 配置内部调度线程池大小
+        void setSchedulerThreadCount(size_t threadCount);
+        size_t getSchedulerThreadCount() const { return schedulerThreadCount_; }
+
     private:
         void processingLoop(size_t workerIndex);
         void launchWorkers();
@@ -126,7 +131,7 @@ namespace GryFlux
         std::atomic<bool> running_;
         size_t queueMaxSize_;
         size_t workerCount_;
-        size_t instancePoolSize_;
+        size_t schedulerThreadCount_;
 
         std::vector<std::thread> processingWorkers_;
 

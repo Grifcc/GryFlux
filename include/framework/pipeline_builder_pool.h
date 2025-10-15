@@ -31,7 +31,7 @@ namespace GryFlux
     class PipelineBuilderPool
     {
     public:
-        explicit PipelineBuilderPool(size_t capacity);
+        explicit PipelineBuilderPool(size_t capacity, size_t builderThreadCount = 0);
         ~PipelineBuilderPool();
 
         PipelineBuilderPool(const PipelineBuilderPool &) = delete;
@@ -44,6 +44,7 @@ namespace GryFlux
         void release(const std::shared_ptr<PipelineBuilder> &builder);
 
         size_t capacity_;
+        size_t builderThreadCount_;
 
         std::mutex mutex_;
         std::condition_variable cv_;

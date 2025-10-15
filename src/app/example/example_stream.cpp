@@ -100,14 +100,15 @@ int main(int argc, char **argv)
 
     CPUAllocator *cpuAllocator = new CPUAllocator();
     // 注册各种处理任务
-    taskRegistry.registerTask<GryFlux::ObjectDetector>("objectDetection");
-    taskRegistry.registerTask<GryFlux::FeatureExtractor>("featExtractor");
-    taskRegistry.registerTask<GryFlux::ImagePreprocess>("imagePreprocess");
-    taskRegistry.registerTask<GryFlux::ObjectTracker>("objectTracker");
-    taskRegistry.registerTask<GryFlux::ResSender>("resultSender");
+    // 为不同任务节点配置各自的实例池规模
+    taskRegistry.registerTask<GryFlux::ObjectDetector>("objectDetection", 2);
+    taskRegistry.registerTask<GryFlux::FeatureExtractor>("featExtractor", 6);
+    taskRegistry.registerTask<GryFlux::ImagePreprocess>("imagePreprocess", 2);
+    taskRegistry.registerTask<GryFlux::ObjectTracker>("objectTracker", 2);
+    taskRegistry.registerTask<GryFlux::ResSender>("resultSender", 2);
 
-    // 创建流式处理管道
-    GryFlux::StreamingPipeline pipeline(10); // 使用10个线程
+    // 创建流式处理管道：6 个管线实例/工作线程、4 个调度线程线程、队列上限 100
+    GryFlux::StreamingPipeline pipeline(6, 4, 100);
 
     // 启用性能分析
     pipeline.enableProfiling(true);

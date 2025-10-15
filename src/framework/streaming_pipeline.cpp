@@ -27,14 +27,14 @@
 namespace GryFlux
 {
 
-    StreamingPipeline::StreamingPipeline(size_t workerCount, size_t queueSize)
+    StreamingPipeline::StreamingPipeline(size_t workerCount, size_t schedulerThreadCount, size_t queueSize)
         : inputQueue_(std::make_shared<threadsafe_queue<std::shared_ptr<DataObject>>>()),
           outputQueue_(std::make_shared<threadsafe_queue<std::shared_ptr<DataObject>>>()),
         outputNodeId_("output"),
           running_(false),
           queueMaxSize_(queueSize),
           workerCount_(workerCount > 0 ? workerCount : 1),
-          instancePoolSize_(workerCount_),
+          schedulerThreadCount_(schedulerThreadCount),
           processedItems_(0),
           errorCount_(0),
           totalProcessingTime_(0.0),
@@ -71,7 +71,15 @@ namespace GryFlux
         input_active_ = true;
         output_active_ = true;
  
-        builderPool_ = std::make_unique<PipelineBuilderPool>(instancePoolSize_);
+        size_t instanceCount = workerCount_ > 0 ? workerCount_ : 1;
+        if (instanceCount == 0)
+        {
+            instanceCount = 1;
+        }
+
+        workerCount_ = instanceCount;
+
+        builderPool_ = std::make_unique<PipelineBuilderPool>(instanceCount, schedulerThreadCount_);
         initializeInstancePool();
         launchWorkers();
 
@@ -254,8 +262,13 @@ namespace GryFlux
         std::lock_guard<std::mutex> lock(instanceMutex_);
         instancePool_.clear();
         instanceFreeList_.clear();
-        instancePool_.reserve(instancePoolSize_);
-        for (size_t i = 0; i < instancePoolSize_; ++i)
+        size_t count = workerCount_ > 0 ? workerCount_ : 1;
+        if (count == 0)
+        {
+            count = 1;
+        }
+        instancePool_.reserve(count);
+        for (size_t i = 0; i < count; ++i)
         {
             auto instance = std::make_shared<PipelineInstance>(builderPool_.get());
             instancePool_.push_back(instance);
@@ -305,6 +318,15 @@ namespace GryFlux
             instanceFreeList_.push_back(instance);
         }
         instanceCv_.notify_one();
+    }
+
+    void StreamingPipeline::setSchedulerThreadCount(size_t threadCount)
+    {
+        if (running_.load())
+        {
+            throw std::runtime_error("Cannot change scheduler thread count while running");
+        }
+        schedulerThreadCount_ = threadCount;
     }
 
     void StreamingPipeline::processingLoop(size_t workerIndex)
