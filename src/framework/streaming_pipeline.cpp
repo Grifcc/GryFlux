@@ -4,6 +4,7 @@
  * GryFlux Framework - Streaming Pipeline Implementation
  *************************************************************************************************************************/
 #include "framework/streaming_pipeline.h"
+#include "framework/node_profiler.h"
 #include "utils/logger.h"
 #include <chrono>
 
@@ -161,6 +162,21 @@ namespace GryFlux
         }
 
         LOG.info("Consumer thread completed, consumed %zu packets", consumedCount);
+    }
+
+    void StreamingPipeline::printProfilingStats() const
+    {
+        NodeProfiler::getInstance().printStats();
+    }
+
+    void StreamingPipeline::resetProfilingStats()
+    {
+        NodeProfiler::getInstance().reset();
+    }
+
+    void StreamingPipeline::setProfilingEnabled(bool enabled)
+    {
+        NodeProfiler::getInstance().setEnabled(enabled);
     }
 
 } // namespace GryFlux

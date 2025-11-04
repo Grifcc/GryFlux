@@ -16,6 +16,7 @@
  *************************************************************************************************************************/
 #include "framework/task_scheduler.h"
 #include "framework/graph_template.h"
+#include "framework/node_profiler.h"
 #include "utils/logger.h"
 
 namespace GryFlux
@@ -70,13 +71,18 @@ namespace GryFlux
             // 2. 执行任务（修改 packet 内的数据）
             // packet 传引用（借用语义）
             // ctx 传引用（防止误操作，CPU任务使用None）
-            if (ctx)
             {
-                node.taskFunc(*packet, *ctx);
-            }
-            else
-            {
-                node.taskFunc(*packet, None::instance());
+                // RAII 自动计时（性能分析）
+                ScopedNodeTimer timer(node.nodeId);
+
+                if (ctx)
+                {
+                    node.taskFunc(*packet, *ctx);
+                }
+                else
+                {
+                    node.taskFunc(*packet, None::instance());
+                }
             }
 
             // 3. 标记完成

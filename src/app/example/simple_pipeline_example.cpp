@@ -167,5 +167,10 @@ int main(int argc, char **argv)
     LOG.info("  ✗ Failure: %zu packets", consumer->getFailureCount());
     LOG.info("========================================");
 
+    // -------------------- Step 7: Show Profiling Statistics --------------------
+
+    LOG.info("Node Performance Statistics:");
+    pipeline.printProfilingStats();
+
     return (consumer->getFailureCount() == 0) ? 0 : 1;
 }

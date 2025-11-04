@@ -83,6 +83,24 @@ public:
      */
     void stop();
 
+    /**
+     * @brief 打印所有节点的性能统计信息
+     *
+     * 输出每个节点的执行次数、平均耗时、最小/最大耗时等。
+     */
+    void printProfilingStats() const;
+
+    /**
+     * @brief 重置性能统计数据
+     */
+    void resetProfilingStats();
+
+    /**
+     * @brief 启用/禁用性能分析
+     * @param enabled true=启用, false=禁用
+     */
+    void setProfilingEnabled(bool enabled);
+
 private:
     /**
      * @brief 生产者线程函数
