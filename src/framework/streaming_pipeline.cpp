@@ -4,9 +4,10 @@
  * GryFlux Framework - Streaming Pipeline Implementation
  *************************************************************************************************************************/
 #include "framework/streaming_pipeline.h"
-#include "framework/node_profiler.h"
+#include "framework/profiler/graph_profiler.h"
 #include "utils/logger.h"
 #include <chrono>
+#include <unordered_map>
 
 namespace GryFlux
 {
@@ -166,17 +167,82 @@ namespace GryFlux
 
     void StreamingPipeline::printProfilingStats() const
     {
-        NodeProfiler::getInstance().printStats();
+        auto events = GraphProfiler::instance().snapshotEvents();
+
+        if (events.empty())
+        {
+            LOG.info("没有可用的 profiler 数据（是否已开启？）");
+            return;
+        }
+
+        struct Summary
+        {
+            size_t scheduled = 0;
+            size_t started = 0;
+            size_t finished = 0;
+            size_t failed = 0;
+            uint64_t totalDuration = 0;
+        };
+
+        std::unordered_map<std::string, Summary> summaryMap;
+
+        for (const auto &evt : events)
+        {
+            auto &entry = summaryMap[evt.nodeId];
+
+            switch (evt.type)
+            {
+            case GraphProfiler::EventType::Scheduled:
+                entry.scheduled++;
+                break;
+            case GraphProfiler::EventType::Started:
+                entry.started++;
+                break;
+            case GraphProfiler::EventType::Finished:
+                entry.finished++;
+                entry.totalDuration += evt.durationNs;
+                break;
+            case GraphProfiler::EventType::Failed:
+                entry.failed++;
+                entry.totalDuration += evt.durationNs;
+                break;
+            }
+        }
+
+        LOG.info("========= Profiling Summary =========");
+        for (const auto &[node, entry] : summaryMap)
+        {
+            double avgMs = entry.finished > 0 ? (entry.totalDuration / static_cast<double>(entry.finished)) / 1'000'000.0 : 0.0;
+            double totalMs = entry.totalDuration / 1'000'000.0;
+
+            LOG.info("节点 %s => scheduled=%zu started=%zu finished=%zu failed=%zu avg=%.3f ms total=%.3f ms",
+                     node.c_str(),
+                     entry.scheduled,
+                     entry.started,
+                     entry.finished,
+                     entry.failed,
+                     avgMs,
+                     totalMs);
+        }
+        LOG.info("=====================================");
     }
 
     void StreamingPipeline::resetProfilingStats()
     {
-        NodeProfiler::getInstance().reset();
+        GraphProfiler::instance().reset();
+        LOG.info("Profiler 数据已重置");
     }
 
     void StreamingPipeline::setProfilingEnabled(bool enabled)
     {
-        NodeProfiler::getInstance().setEnabled(enabled);
+        GraphProfiler::instance().setEnabled(enabled);
+        LOG.info("Profiler 已%s", enabled ? "启用" : "关闭");
+    }
+
+    void StreamingPipeline::dumpProfilingTimeline(const std::string &filePath) const
+    {
+        GraphProfiler::instance().dumpTimelineJson(filePath);
+        LOG.info("Profiler 时间线已导出至 %s", filePath.c_str());
     }
 
 } // namespace GryFlux

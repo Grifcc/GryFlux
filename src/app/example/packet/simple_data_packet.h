@@ -44,4 +44,9 @@ struct SimpleDataPacket : public GryFlux::DataPacket
     std::vector<float> trackVec;         // ObjectTracker 输出 (融合结果)
 
     SimpleDataPacket() : id(0) {}
+
+    uint64_t getId() const override
+    {
+        return static_cast<uint64_t>(id);
+    }
 };

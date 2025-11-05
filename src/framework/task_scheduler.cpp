@@ -16,8 +16,9 @@
  *************************************************************************************************************************/
 #include "framework/task_scheduler.h"
 #include "framework/graph_template.h"
-#include "framework/node_profiler.h"
+#include "framework/profiler/graph_profiler.h"
 #include "utils/logger.h"
+#include <deque>
 
 namespace GryFlux
 {
@@ -40,41 +41,59 @@ namespace GryFlux
 
     void TaskScheduler::scheduleNode(DataPacket *packet, size_t nodeIndex)
     {
-        // 统一调度策略：所有节点都提交到线程池
-        threadPool_->enqueue([this, packet, nodeIndex]()
-                              { executeNode(packet, nodeIndex); });
-    }
-
-    void TaskScheduler::executeNode(DataPacket *packet, size_t nodeIndex)
-    {
         auto &tmpl = packet->executionState_.graphTemplate;
-        auto &node = tmpl->getNode(nodeIndex);
+        const auto &node = tmpl->getNode(nodeIndex);
 
-        std::shared_ptr<Context> ctx;
-
-        // 1. 如果需要资源，阻塞获取
-        if (!node.resourceTypeName.empty())
+        auto &profiler = GraphProfiler::instance();
+        if (profiler.isEnabled())
         {
-            ctx = resourcePool_->acquire(node.resourceTypeName, resourceAcquireTimeout_);
-
-            if (!ctx)
-            {
-                LOG.error("Failed to acquire resource '%s' for node '%s' (index %zu)",
-                          node.resourceTypeName.c_str(), node.nodeId.c_str(), nodeIndex);
-                onNodeFailed(packet, nodeIndex);
-                return;
-            }
+            profiler.recordNodeScheduled(packet, node.nodeId);
         }
 
-        try
-        {
-            // 2. 执行任务（修改 packet 内的数据）
-            // packet 传引用（借用语义）
-            // ctx 传引用（防止误操作，CPU任务使用None）
-            {
-                // RAII 自动计时（性能分析）
-                ScopedNodeTimer timer(node.nodeId);
+        threadPool_->enqueue([this, packet, nodeIndex]()
+                              { executeNodeChain(packet, nodeIndex); });
+    }
 
+    void TaskScheduler::executeNodeChain(DataPacket *packet, size_t nodeIndex)
+    {
+        auto &tmpl = packet->executionState_.graphTemplate;
+        auto &profiler = GraphProfiler::instance();
+        bool profilerEnabled = profiler.isEnabled();
+
+        std::deque<size_t> readyQueue;
+        readyQueue.push_back(nodeIndex);
+
+        while (!readyQueue.empty())
+        {
+            size_t currentIndex = readyQueue.front();
+            readyQueue.pop_front();
+
+            auto &node = tmpl->getNode(currentIndex);
+            std::shared_ptr<Context> ctx;
+
+            if (!node.resourceTypeName.empty())
+            {
+                ctx = resourcePool_->acquire(node.resourceTypeName, resourceAcquireTimeout_);
+
+                if (!ctx)
+                {
+                    LOG.error("Failed to acquire resource '%s' for node '%s' (index %zu)",
+                              node.resourceTypeName.c_str(), node.nodeId.c_str(), currentIndex);
+
+                    if (profilerEnabled)
+                    {
+                        profiler.recordNodeFailed(packet, node.nodeId, 0);
+                    }
+
+                    onNodeFailed(packet, currentIndex);
+                    return;
+                }
+            }
+
+            GraphProfiler::NodeExecutionScope execScope(packet, node.nodeId);
+
+            try
+            {
                 if (ctx)
                 {
                     node.taskFunc(*packet, *ctx);
@@ -83,45 +102,57 @@ namespace GryFlux
                 {
                     node.taskFunc(*packet, None::instance());
                 }
-            }
 
-            // 3. 标记完成
-            packet->markNodeCompleted(nodeIndex);
+                packet->markNodeCompleted(currentIndex);
 
-            // 4. 释放资源（RAII）
-            if (ctx)
-            {
-                resourcePool_->release(node.resourceTypeName, ctx);
-            }
-
-            // 5. 通知并调度所有后继（事件驱动核心）
-            for (size_t succIdx : node.successorIndices)
-            {
-                packet->notifyPredecessorCompleted(succIdx);
-
-                if (packet->tryMarkNodeReady(succIdx))
+                if (ctx)
                 {
-                    scheduleNode(packet, succIdx); // 后继就绪，立即调度
+                    resourcePool_->release(node.resourceTypeName, ctx);
+                }
+
+                bool inlineAssigned = false;
+                for (size_t succIdx : node.successorIndices)
+                {
+                    packet->notifyPredecessorCompleted(succIdx);
+
+                    if (packet->tryMarkNodeReady(succIdx))
+                    {
+                        if (!inlineAssigned)
+                        {
+                            if (profilerEnabled)
+                            {
+                                profiler.recordNodeScheduled(packet, tmpl->getNode(succIdx).nodeId);
+                            }
+                            readyQueue.push_back(succIdx);
+                            inlineAssigned = true;
+                        }
+                        else
+                        {
+                            scheduleNode(packet, succIdx);
+                        }
+                    }
+                }
+
+                if (currentIndex == tmpl->getOutputNodeIndex())
+                {
+                    onGraphCompleted(packet);
                 }
             }
-
-            // 6. 检查是否是输出节点
-            if (nodeIndex == tmpl->getOutputNodeIndex())
+            catch (const std::exception &e)
             {
-                onGraphCompleted(packet);
-            }
-        }
-        catch (const std::exception &e)
-        {
-            LOG.error("Node '%s' (index %zu) execution failed: %s",
-                      node.nodeId.c_str(), nodeIndex, e.what());
+                execScope.markFailed();
 
-            if (ctx)
-            {
-                resourcePool_->release(node.resourceTypeName, ctx);
-            }
+                LOG.error("Node '%s' (index %zu) execution failed: %s",
+                          node.nodeId.c_str(), currentIndex, e.what());
 
-            onNodeFailed(packet, nodeIndex);
+                if (ctx)
+                {
+                    resourcePool_->release(node.resourceTypeName, ctx);
+                }
+
+                onNodeFailed(packet, currentIndex);
+                return;
+            }
         }
     }
 

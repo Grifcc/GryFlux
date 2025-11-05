@@ -14,6 +14,7 @@
 #include <memory>
 #include <thread>
 #include <atomic>
+#include <string>
 
 namespace GryFlux
 {
@@ -100,6 +101,12 @@ public:
      * @param enabled true=启用, false=禁用
      */
     void setProfilingEnabled(bool enabled);
+
+    /**
+     * @brief 导出节点执行时间线数据（JSON 格式）
+     * @param filePath 输出文件路径
+     */
+    void dumpProfilingTimeline(const std::string &filePath) const;
 
 private:
     /**

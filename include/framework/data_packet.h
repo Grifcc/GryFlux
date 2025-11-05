@@ -16,9 +16,10 @@
  *************************************************************************************************************************/
 #pragma once
 
+#include <atomic>
+#include <cstdint>
 #include <memory>
 #include <vector>
-#include <atomic>
 
 namespace GryFlux
 {
@@ -77,6 +78,11 @@ namespace GryFlux
         };
 
         ExecutionState executionState_;
+
+        /**
+         * @brief 返回数据包的唯一 ID（必须实现）
+         */
+        virtual uint64_t getId() const = 0;
 
         /**
          * @brief 初始化执行状态（框架调用）

@@ -67,12 +67,12 @@ namespace GryFlux
 
     private:
         /**
-         * @brief 执行单个节点（在线程池线程中）
+         * @brief 在当前线程执行节点及其内联后继
          *
          * @param packet 数据包
-         * @param nodeIndex 节点索引
+         * @param nodeIndex 起始节点索引
          */
-        void executeNode(DataPacket *packet, size_t nodeIndex);
+        void executeNodeChain(DataPacket *packet, size_t nodeIndex);
 
         /**
          * @brief 节点执行失败回调

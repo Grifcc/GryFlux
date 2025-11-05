@@ -56,6 +56,8 @@
 
 #include <iostream>
 #include <chrono>
+#include <queue>
+#include <sstream>
 
 int main(int argc, char **argv)
 {
@@ -75,8 +77,9 @@ int main(int argc, char **argv)
 
     // Register 2 simulated NPUs
     resourcePool->registerResourceType("npu", {
-                                                   std::make_shared<SimulatedNPUContext>(0),
-                                                   std::make_shared<SimulatedNPUContext>(1)});
+                                                  std::make_shared<SimulatedNPUContext>(0),
+                                                  std::make_shared<SimulatedNPUContext>(1),
+                                                  std::make_shared<SimulatedNPUContext>(2)});
 
     LOG.info("Registered 2 NPU resources");
 
@@ -100,7 +103,7 @@ int main(int argc, char **argv)
             builder->addTask<PipelineNodes::ObjectDetectionNode>(
                 "objectDetection",
                 "npu",     // Requires NPU resource
-                {"input"}  // Depends on input node (并行!)
+                {"imagePreprocess"}  // Depends on input node (并行!)
             );
 
             // FeatExtractor - Depends on ImagePreprocess
@@ -117,10 +120,7 @@ int main(int argc, char **argv)
             );
         });
 
-    LOG.info("Graph template built with parallel nodes:");
-    LOG.info("  Input -> ImagePreprocess -> FeatExtractor ┐");
-    LOG.info("       └-> ObjectDetection(NPU) ─────────────→ ObjectTracker");
-    LOG.info("Transformation: track = (id + 10) + (id * 2 + 5) = 3 * id + 15");
+   LOG.info("Transformation: track = (id + 10) + (id * 2 + 5) = 3 * id + 15");
 
     // -------------------- Step 3: Create Data Source --------------------
 
@@ -146,8 +146,26 @@ int main(int argc, char **argv)
         graphTemplate,
         resourcePool,
         consumer,
-        8  // Thread pool size (maxActivePackets = 8 × 2 = 16 by default)
+        12, // Thread pool size (maxActivePackets = 8 × 2 = 16 by default),
+        3
     );
+
+    // 启用 profiler（可通过命令行参数控制）
+    bool profilingEnabled = true;
+    if (argc > 1 && std::string(argv[1]) == "--no-profiler")
+    {
+        profilingEnabled = false;
+    }
+
+    pipeline.setProfilingEnabled(profilingEnabled);
+    if (profilingEnabled)
+    {
+        LOG.info("Graph profiler 已启用，可使用 --no-profiler 关闭");
+    }
+    else
+    {
+        LOG.info("Graph profiler 已禁用");
+    }
 
     // Run pipeline (blocks until all frames processed)
     pipeline.run();
@@ -169,8 +187,19 @@ int main(int argc, char **argv)
 
     // -------------------- Step 7: Show Profiling Statistics --------------------
 
-    LOG.info("Node Performance Statistics:");
-    pipeline.printProfilingStats();
+    if (profilingEnabled)
+    {
+        LOG.info("Graph Profiler Summary:");
+        pipeline.printProfilingStats();
+
+        const std::string timelinePath = "graph_timeline.json";
+        pipeline.dumpProfilingTimeline(timelinePath);
+        LOG.info("Graph timeline dumped to %s (可用于可视化)", timelinePath.c_str());
+    }
+    else
+    {
+        LOG.info("Profiler 未启用，跳过统计输出。");
+    }
 
     return (consumer->getFailureCount() == 0) ? 0 : 1;
 }
