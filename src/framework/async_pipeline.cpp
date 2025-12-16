@@ -1,9 +1,9 @@
 /*************************************************************************************************************************
  * Copyright 2025 Grifcc
  *
- * GryFlux Framework - Streaming Pipeline Implementation
+ * GryFlux Framework - Async Pipeline Implementation
  *************************************************************************************************************************/
-#include "framework/streaming_pipeline.h"
+#include "framework/async_pipeline.h"
 #include "framework/profiler/graph_profiler.h"
 #include "utils/logger.h"
 #include <chrono>
@@ -12,81 +12,72 @@
 namespace GryFlux
 {
 
-    StreamingPipeline::StreamingPipeline(std::shared_ptr<DataSource> source,
-                                         std::shared_ptr<GraphTemplate> graphTemplate,
-                                         std::shared_ptr<ResourcePool> resourcePool,
-                                         std::shared_ptr<DataConsumer> consumer,
-                                         size_t threadPoolSize,
-                                         size_t maxActivePackets)
+    AsyncPipeline::AsyncPipeline(std::shared_ptr<DataSource> source,
+                                 std::shared_ptr<GraphTemplate> graphTemplate,
+                                 std::shared_ptr<ResourcePool> resourcePool,
+                                 std::shared_ptr<DataConsumer> consumer,
+                                 size_t threadPoolSize,
+                                 size_t maxActivePackets)
         : source_(source), consumer_(consumer), running_(false), producerDone_(false)
     {
-        // 创建 AsyncGraphProcessor
         processor_ = std::make_shared<AsyncGraphProcessor>(
             graphTemplate,
             resourcePool,
             threadPoolSize,
             maxActivePackets);
 
-        LOG.info("StreamingPipeline created");
+        LOG.info("AsyncPipeline created");
     }
 
-    StreamingPipeline::~StreamingPipeline()
+    AsyncPipeline::~AsyncPipeline()
     {
         stop();
     }
 
-    void StreamingPipeline::run()
+    void AsyncPipeline::run()
     {
         if (running_)
         {
-            LOG.warning("StreamingPipeline already running");
+            LOG.warning("AsyncPipeline already running");
             return;
         }
 
         running_ = true;
         producerDone_ = false;
 
-        // 启动 processor
         processor_->start();
 
-        // 启动生产者线程
-        producerThread_ = std::thread(&StreamingPipeline::producerThread, this);
+        producerThread_ = std::thread(&AsyncPipeline::producerThread, this);
+        consumerThread_ = std::thread(&AsyncPipeline::consumerThread, this);
 
-        // 启动消费者线程
-        consumerThread_ = std::thread(&StreamingPipeline::consumerThread, this);
+        LOG.info("AsyncPipeline started");
 
-        LOG.info("StreamingPipeline started");
-
-        // 等待生产者完成
         if (producerThread_.joinable())
         {
             producerThread_.join();
         }
 
-        // 等待消费者完成
         if (consumerThread_.joinable())
         {
             consumerThread_.join();
         }
 
-        // 停止 processor
         processor_->stop();
 
         running_ = false;
-        LOG.info("StreamingPipeline completed");
+        LOG.info("AsyncPipeline completed");
     }
 
-    void StreamingPipeline::stop()
+    void AsyncPipeline::stop()
     {
         if (!running_)
         {
             return;
         }
 
-        LOG.info("Stopping StreamingPipeline...");
+        LOG.info("Stopping AsyncPipeline...");
         running_ = false;
 
-        // 等待线程结束
         if (producerThread_.joinable())
         {
             producerThread_.join();
@@ -100,7 +91,7 @@ namespace GryFlux
         processor_->stop();
     }
 
-    void StreamingPipeline::producerThread()
+    void AsyncPipeline::producerThread()
     {
         LOG.info("Producer thread started");
 
@@ -108,7 +99,6 @@ namespace GryFlux
 
         while (running_ && source_->hasMore())
         {
-            // 背压控制：等待有空位
             while (running_ && processor_->getActivePacketCount() >= processor_->getMaxActivePackets())
             {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -119,7 +109,6 @@ namespace GryFlux
                 break;
             }
 
-            // 生产数据包
             auto packet = source_->produce();
             if (packet)
             {
@@ -132,7 +121,7 @@ namespace GryFlux
         LOG.info("Producer thread completed, produced %zu packets", producedCount);
     }
 
-    void StreamingPipeline::consumerThread()
+    void AsyncPipeline::consumerThread()
     {
         LOG.info("Consumer thread started");
 
@@ -140,24 +129,20 @@ namespace GryFlux
 
         while (running_)
         {
-            // 尝试获取输出
             auto packet = processor_->tryGetOutput();
 
             if (packet)
             {
-                // 消费数据包
                 consumer_->consume(std::move(packet));
                 consumedCount++;
             }
             else
             {
-                // 如果生产者完成且没有活跃数据包，退出
                 if (producerDone_ && processor_->getActivePacketCount() == 0)
                 {
                     break;
                 }
 
-                // 否则短暂休眠
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
         }
@@ -165,7 +150,7 @@ namespace GryFlux
         LOG.info("Consumer thread completed, consumed %zu packets", consumedCount);
     }
 
-    void StreamingPipeline::printProfilingStats() const
+    void AsyncPipeline::printProfilingStats() const
     {
         auto events = GraphProfiler::instance().snapshotEvents();
 
@@ -227,22 +212,23 @@ namespace GryFlux
         LOG.info("=====================================");
     }
 
-    void StreamingPipeline::resetProfilingStats()
+    void AsyncPipeline::resetProfilingStats()
     {
         GraphProfiler::instance().reset();
         LOG.info("Profiler 数据已重置");
     }
 
-    void StreamingPipeline::setProfilingEnabled(bool enabled)
+    void AsyncPipeline::setProfilingEnabled(bool enabled)
     {
         GraphProfiler::instance().setEnabled(enabled);
         LOG.info("Profiler 已%s", enabled ? "启用" : "关闭");
     }
 
-    void StreamingPipeline::dumpProfilingTimeline(const std::string &filePath) const
+    void AsyncPipeline::dumpProfilingTimeline(const std::string &filePath) const
     {
         GraphProfiler::instance().dumpTimelineJson(filePath);
         LOG.info("Profiler 时间线已导出至 %s", filePath.c_str());
     }
 
 } // namespace GryFlux
+

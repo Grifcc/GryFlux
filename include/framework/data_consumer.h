@@ -38,7 +38,7 @@ public:
     /**
      * @brief 消费一个输出数据包
      *
-     * 此方法会被 StreamingPipeline 调用，处理每个完成的数据包。
+     * 此方法会被 AsyncPipeline 调用，处理每个完成的数据包。
      *
      * @param packet 完成的数据包（unique_ptr，转移所有权）
      */

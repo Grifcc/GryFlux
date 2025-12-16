@@ -1,10 +1,10 @@
 /*************************************************************************************************************************
  * Copyright 2025 Grifcc
  *
- * GryFlux Framework - Streaming Pipeline
+ * GryFlux Framework - Async Pipeline
  *************************************************************************************************************************/
-#ifndef GRYFLUX_STREAMING_PIPELINE_H
-#define GRYFLUX_STREAMING_PIPELINE_H
+#ifndef GRYFLUX_ASYNC_PIPELINE_H
+#define GRYFLUX_ASYNC_PIPELINE_H
 
 #include "data_source.h"
 #include "data_consumer.h"
@@ -20,9 +20,9 @@ namespace GryFlux
 {
 
 /**
- * @brief 流式处理管道 - Source → Graph → Consumer
+ * @brief 异步处理管道 - Source → Graph → Consumer
  *
- * 封装完整的流式处理流程：
+ * 封装完整的异步处理流程：
  * - Source: 持续产生数据
  * - Graph: 处理数据（通过 AsyncGraphProcessor）
  * - Consumer: 消费结果
@@ -38,11 +38,11 @@ namespace GryFlux
  * auto source = std::make_shared<VideoSource>("input.mp4");
  * auto consumer = std::make_shared<VideoWriter>("output.mp4");
  *
- * StreamingPipeline pipeline(source, graphTemplate, resourcePool, consumer);
+ * AsyncPipeline pipeline(source, graphTemplate, resourcePool, consumer);
  * pipeline.run();  // 阻塞直到处理完成
  * @endcode
  */
-class StreamingPipeline
+class AsyncPipeline
 {
 public:
     /**
@@ -55,20 +55,20 @@ public:
      * @param threadPoolSize 线程池大小（0表示自动）
      * @param maxActivePackets 最大活跃数据包数（0表示自动：threadPoolSize × 2）
      */
-    StreamingPipeline(std::shared_ptr<DataSource> source,
-                      std::shared_ptr<GraphTemplate> graphTemplate,
-                      std::shared_ptr<ResourcePool> resourcePool,
-                      std::shared_ptr<DataConsumer> consumer,
-                      size_t threadPoolSize = 0,
-                      size_t maxActivePackets = 0);
+    AsyncPipeline(std::shared_ptr<DataSource> source,
+                  std::shared_ptr<GraphTemplate> graphTemplate,
+                  std::shared_ptr<ResourcePool> resourcePool,
+                  std::shared_ptr<DataConsumer> consumer,
+                  size_t threadPoolSize = 0,
+                  size_t maxActivePackets = 0);
 
-    ~StreamingPipeline();
+    ~AsyncPipeline();
 
     // 禁止拷贝和移动
-    StreamingPipeline(const StreamingPipeline &) = delete;
-    StreamingPipeline &operator=(const StreamingPipeline &) = delete;
-    StreamingPipeline(StreamingPipeline &&) = delete;
-    StreamingPipeline &operator=(StreamingPipeline &&) = delete;
+    AsyncPipeline(const AsyncPipeline &) = delete;
+    AsyncPipeline &operator=(const AsyncPipeline &) = delete;
+    AsyncPipeline(AsyncPipeline &&) = delete;
+    AsyncPipeline &operator=(AsyncPipeline &&) = delete;
 
     /**
      * @brief 运行管道（阻塞直到完成）
@@ -136,4 +136,5 @@ private:
 
 } // namespace GryFlux
 
-#endif // GRYFLUX_STREAMING_PIPELINE_H
+#endif // GRYFLUX_ASYNC_PIPELINE_H
+

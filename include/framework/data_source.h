@@ -42,7 +42,7 @@ public:
     /**
      * @brief 产生一个数据包
      *
-     * 此方法会被 StreamingPipeline 循环调用，每次调用产生一个新的数据包。
+     * 此方法会被 AsyncPipeline 循环调用，每次调用产生一个新的数据包。
      *
      * @return 新创建的数据包（unique_ptr，转移所有权）
      */

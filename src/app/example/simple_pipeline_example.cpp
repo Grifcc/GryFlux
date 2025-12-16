@@ -36,7 +36,7 @@
 #include "framework/resource_pool.h"
 #include "framework/graph_template.h"
 #include "framework/template_builder.h"
-#include "framework/streaming_pipeline.h"
+#include "framework/async_pipeline.h"
 #include "utils/logger.h"
 
 // Custom types
@@ -135,13 +135,13 @@ int main(int argc, char **argv)
 
     LOG.info("Created ResultConsumer");
 
-    // -------------------- Step 5: Create and Run Streaming Pipeline --------------------
+    // -------------------- Step 5: Create and Run Async Pipeline --------------------
 
-    LOG.info("Starting streaming pipeline...");
+    LOG.info("Starting async pipeline...");
 
     auto startTime = std::chrono::steady_clock::now();
 
-    GryFlux::StreamingPipeline pipeline(
+    GryFlux::AsyncPipeline pipeline(
         source,
         graphTemplate,
         resourcePool,
