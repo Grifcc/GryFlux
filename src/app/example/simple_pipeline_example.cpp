@@ -37,6 +37,7 @@
 #include "framework/graph_template.h"
 #include "framework/template_builder.h"
 #include "framework/async_pipeline.h"
+#include "framework/profiler/profiling_build_config.h"
 #include "utils/logger.h"
 
 // Custom types
@@ -160,21 +161,14 @@ int main(int argc, char **argv)
         12 // Thread pool size (maxActivePackets = 8 - 1 = 7 by default),
     );
 
-    // 启用 profiler（可通过命令行参数控制）
-    bool profilingEnabled = true;
-    if (argc > 1 && std::string(argv[1]) == "--no-profiler")
+    if constexpr (GryFlux::Profiling::kBuildProfiling)
     {
-        profilingEnabled = false;
-    }
-
-    pipeline.setProfilingEnabled(profilingEnabled);
-    if (profilingEnabled)
-    {
-        LOG.info("Graph profiler 已启用，可使用 --no-profiler 关闭");
+        LOG.info("Graph profiler 已启用（build-time: GRYFLUX_BUILD_PROFILING=1）");
+        pipeline.setProfilingEnabled(true);
     }
     else
     {
-        LOG.info("Graph profiler 已禁用");
+        LOG.info("Graph profiler 未编译（build-time: GRYFLUX_BUILD_PROFILING=0），如需启用请使用 -DGRYFLUX_BUILD_PROFILING=1 重新编译。");
     }
 
     // Run pipeline (blocks until all frames processed)
@@ -196,8 +190,7 @@ int main(int argc, char **argv)
     LOG.info("========================================");
 
     // -------------------- Step 7: Show Profiling Statistics --------------------
-
-    if (profilingEnabled)
+    if constexpr (GryFlux::Profiling::kBuildProfiling)
     {
         LOG.info("Graph Profiler Summary:");
         pipeline.printProfilingStats();
@@ -208,8 +201,7 @@ int main(int argc, char **argv)
     }
     else
     {
-        LOG.info("Profiler 未启用，跳过统计输出。");
+        LOG.info("Graph profiler 未编译，跳过统计输出。");
     }
-
     return (consumer->getFailureCount() == 0) ? 0 : 1;
 }

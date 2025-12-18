@@ -31,6 +31,7 @@ Options:
   --build-type <Debug|Release|RelWithDebInfo|MinSizeRel>  Default: Debug
   --build-dir <path>                                     Default: build/aarch64
   --jobs <N>                                              Default: nproc
+  --profile                                               Build with graph profiling compiled in (-DGRYFLUX_BUILD_PROFILING=1)
   --clean                                                 Remove build dir before configure
   --install                                               Run "cmake --install"
   --prefix <path>                                         Install prefix (needs --install)
@@ -55,6 +56,7 @@ EOF
 BUILD_TYPE="Debug"
 BUILD_DIR="${PROJECT_ROOT}/build/aarch64"
 JOBS=""
+DO_PROFILE=false
 DO_CLEAN=false
 DO_INSTALL=false
 PREFIX=""
@@ -72,6 +74,7 @@ while (($#)); do
     --build-type) BUILD_TYPE="${2:-}"; shift 2 ;;
     --build-dir) BUILD_DIR="${2:-}"; shift 2 ;;
     --jobs) JOBS="${2:-}"; shift 2 ;;
+    --profile) DO_PROFILE=true; shift ;;
     --clean) DO_CLEAN=true; shift ;;
     --install) DO_INSTALL=true; shift ;;
     --prefix) PREFIX="${2:-}"; shift 2 ;;
@@ -136,6 +139,7 @@ echo "Toolchain: ${TOOLCHAIN_FILE}"
 echo "Prefix:    ${TOOLCHAIN_PREFIX}-"
 echo "Bin dir:   ${TOOLCHAIN_BIN_DIR:-<PATH>}"
 echo "Sysroot:   ${SYSROOT:-<none>}"
+echo "Profile:   ${DO_PROFILE}"
 echo "Install:   ${DO_INSTALL}"
 echo "=================================================="
 
@@ -154,6 +158,11 @@ CMAKE_CONFIG_ARGS=(
   "-DBUILD_TEST=OFF"
   "-DTOOLCHAIN_PREFIX=${TOOLCHAIN_PREFIX}"
 )
+
+if [[ "${DO_PROFILE}" == "true" ]]; then
+  cxx_flags="${CXXFLAGS:-} -DGRYFLUX_BUILD_PROFILING=1"
+  CMAKE_CONFIG_ARGS+=("-DCMAKE_CXX_FLAGS:STRING=${cxx_flags}")
+fi
 
 if [[ -n "${TOOLCHAIN_BIN_DIR}" ]]; then
   CMAKE_CONFIG_ARGS+=("-DTOOLCHAIN_BIN_DIR=${TOOLCHAIN_BIN_DIR}")

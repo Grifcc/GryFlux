@@ -17,7 +17,7 @@
 #include "framework/task_scheduler.h"
 #include "framework/graph_template.h"
 #include "framework/node_base.h"
-#include "framework/profiler/graph_profiler.h"
+#include "framework/profiler/profiling.h"
 #include "utils/logger.h"
 #include <deque>
 #include <stdexcept>
@@ -43,13 +43,9 @@ namespace GryFlux
 
     void TaskScheduler::scheduleNode(DataPacket *packet, size_t nodeIndex)
     {
-        auto &tmpl = packet->executionState_.graphTemplate;
-        const auto &node = tmpl->getTask(nodeIndex);
-
-        auto &profiler = GraphProfiler::instance();
-        if (profiler.isEnabled())
+        if constexpr (Profiling::kBuildProfiling)
         {
-            profiler.recordNodeScheduled(packet, node.nodeId);
+            Profiling::recordNodeScheduled(packet, packet->executionState_.graphTemplate->getTask(nodeIndex).nodeId);
         }
 
         threadPool_->enqueue([this, packet, nodeIndex]()
@@ -59,8 +55,6 @@ namespace GryFlux
     void TaskScheduler::executeNodeChain(DataPacket *packet, size_t nodeIndex)
     {
         auto &tmpl = packet->executionState_.graphTemplate;
-        auto &profiler = GraphProfiler::instance();
-        bool profilerEnabled = profiler.isEnabled();
 
         std::deque<size_t> readyQueue;
         readyQueue.push_back(nodeIndex);
@@ -82,9 +76,9 @@ namespace GryFlux
                     LOG.error("Failed to acquire resource '%s' for node '%s' (index %zu)",
                               node.resourceTypeName.c_str(), node.nodeId.c_str(), currentIndex);
 
-                    if (profilerEnabled)
+                    if constexpr (Profiling::kBuildProfiling)
                     {
-                        profiler.recordNodeFailed(packet, node.nodeId, 0);
+                        Profiling::recordNodeFailed(packet, node.nodeId, 0);
                     }
 
                     onNodeFailed(packet, currentIndex);
@@ -92,7 +86,7 @@ namespace GryFlux
                 }
             }
 
-            GraphProfiler::NodeExecutionScope execScope(packet, node.nodeId);
+            Profiling::NodeScope execScope(packet, node.nodeId);
 
             try
             {
@@ -126,9 +120,9 @@ namespace GryFlux
                     {
                         if (!inlineAssigned)
                         {
-                            if (profilerEnabled)
+                            if constexpr (Profiling::kBuildProfiling)
                             {
-                                profiler.recordNodeScheduled(packet, tmpl->getTask(succIdx).nodeId);
+                                Profiling::recordNodeScheduled(packet, tmpl->getTask(succIdx).nodeId);
                             }
                             readyQueue.push_back(succIdx);
                             inlineAssigned = true;

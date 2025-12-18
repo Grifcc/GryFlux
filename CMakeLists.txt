@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.16.0)
 project(GryFlux VERSION 1.0.0 LANGUAGES CXX C)
 
+message(STATUS "Graph profiling build switch: compile with -DGRYFLUX_BUILD_PROFILING=1 (or 0) and rebuild")
+
 # Set common compile warning suppressions and linking options
 function(set_common_compile_flags)
     set(common_flags "-Wl,--allow-shlib-undefined -Wno-class-memaccess -Wno-deprecated-declarations -Wno-sign-compare")

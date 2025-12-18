@@ -190,12 +190,13 @@ namespace GryFlux
     GraphProfiler::NodeExecutionScope::NodeExecutionScope(DataPacket *packet, const std::string &nodeId)
         : profiler_(GraphProfiler::instance()),
           packet_(packet),
-          nodeId_(nodeId),
+          nodeId_(),
           enabled_(profiler_.isEnabled()),
           failed_(false)
     {
         if (enabled_)
         {
+            nodeId_ = nodeId;
             profiler_.recordNodeStarted(packet_, nodeId_);
             start_ = std::chrono::steady_clock::now();
         }

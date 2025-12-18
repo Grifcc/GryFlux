@@ -4,7 +4,7 @@
  * GryFlux Framework - Async Pipeline Implementation
  *************************************************************************************************************************/
 #include "framework/async_pipeline.h"
-#include "framework/profiler/graph_profiler.h"
+#include "framework/profiler/profiling.h"
 #include "utils/logger.h"
 #include <chrono>
 #include <unordered_map>
@@ -152,11 +152,17 @@ namespace GryFlux
 
     void AsyncPipeline::printProfilingStats() const
     {
-        auto events = GraphProfiler::instance().snapshotEvents();
+        if constexpr (!Profiling::kBuildProfiling)
+        {
+            LOG.error("当前构建未启用 graph profiling（Profiling::kBuildProfiling=false），跳过统计输出。");
+            return;
+        }
+
+        auto events = Profiling::snapshotEvents();
 
         if (events.empty())
         {
-            LOG.info("没有可用的 profiler 数据（是否已开启？）");
+            LOG.error("没有可用的 profiler 数据（是否已开启？）");
             return;
         }
 
@@ -177,17 +183,17 @@ namespace GryFlux
 
             switch (evt.type)
             {
-            case GraphProfiler::EventType::Scheduled:
+            case Profiling::EventType::Scheduled:
                 entry.scheduled++;
                 break;
-            case GraphProfiler::EventType::Started:
+            case Profiling::EventType::Started:
                 entry.started++;
                 break;
-            case GraphProfiler::EventType::Finished:
+            case Profiling::EventType::Finished:
                 entry.finished++;
                 entry.totalDuration += evt.durationNs;
                 break;
-            case GraphProfiler::EventType::Failed:
+            case Profiling::EventType::Failed:
                 entry.failed++;
                 entry.totalDuration += evt.durationNs;
                 break;
@@ -214,21 +220,43 @@ namespace GryFlux
 
     void AsyncPipeline::resetProfilingStats()
     {
-        GraphProfiler::instance().reset();
-        LOG.info("Profiler 数据已重置");
+        if constexpr (Profiling::kBuildProfiling)
+        {
+            Profiling::reset();
+            LOG.info("Profiler 数据已重置");
+        }
+        else
+        {
+            LOG.error("当前构建未启用 graph profiling（Profiling::kBuildProfiling=false），忽略 reset 请求。");
+        }
     }
 
     void AsyncPipeline::setProfilingEnabled(bool enabled)
     {
-        GraphProfiler::instance().setEnabled(enabled);
-        LOG.info("Profiler 已%s", enabled ? "启用" : "关闭");
+        if constexpr (Profiling::kBuildProfiling)
+        {
+            Profiling::setEnabled(enabled);
+            LOG.info("Profiler 已%s", enabled ? "启用" : "关闭");
+        }
+        else
+        {
+            (void)enabled;
+            LOG.error("当前构建未启用 graph profiling（Profiling::kBuildProfiling=false），忽略 setEnabled 请求。");
+        }
     }
 
     void AsyncPipeline::dumpProfilingTimeline(const std::string &filePath) const
     {
-        GraphProfiler::instance().dumpTimelineJson(filePath);
-        LOG.info("Profiler 时间线已导出至 %s", filePath.c_str());
+        if constexpr (Profiling::kBuildProfiling)
+        {
+            Profiling::dumpTimelineJson(filePath);
+            LOG.info("Profiler 时间线已导出至 %s", filePath.c_str());
+        }
+        else
+        {
+            (void)filePath;
+            LOG.error("当前构建未启用 graph profiling（Profiling::kBuildProfiling=false），跳过时间线导出。");
+        }
     }
 
 } // namespace GryFlux
-

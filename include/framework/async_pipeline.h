@@ -10,6 +10,7 @@
 #include "data_consumer.h"
 #include "async_graph_processor.h"
 #include "graph_template.h"
+#include "profiler/profiling.h"
 #include "resource_pool.h"
 #include "utils/noncopyable.h"
 #include <memory>
