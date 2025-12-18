@@ -70,14 +70,19 @@ struct MyDataPacket : public GryFlux::DataPacket {
     int id;
     std::vector<float> rawData;
     std::vector<float> result;
+
+    MyDataPacket()
+        : id(0), rawData(256), result(256)
+    {
+    }
 };
 
 // 2. 定义节点
 class InputNode : public GryFlux::NodeBase {
     void execute(DataPacket &packet, Context &ctx) override {
         auto &p = static_cast<MyDataPacket &>(packet);
-        p.rawData.resize(256);
-        // 初始化数据...
+        // rawData 已在 DataPacket 构造函数中预分配（固定大小）
+        for (size_t i = 0; i < p.rawData.size(); ++i) p.rawData[i] = static_cast<float>(p.id);
     }
 };
 
@@ -85,6 +90,13 @@ class ProcessNode : public GryFlux::NodeBase {
     void execute(DataPacket &packet, Context &ctx) override {
         auto &p = static_cast<MyDataPacket &>(packet);
         // 处理数据...
+    }
+};
+
+class OutputNode : public GryFlux::NodeBase {
+    void execute(DataPacket &packet, Context &ctx) override {
+        (void)packet;
+        (void)ctx;
     }
 };
 
@@ -320,13 +332,13 @@ void HardwareNode::execute(DataPacket &packet, Context &ctx) {
 
 AsyncPipeline 自动控制活跃数据包数量：
 ```cpp
-// maxActivePackets = threadPoolSize × 2 (默认)
+// maxActivePackets = threadPoolSize - 1 (默认)
 AsyncPipeline pipeline(source, template, pool, consumer, 8);
-// 最多 16 个数据包同时在处理
+// 最多 7 个数据包同时在处理
 
 // 自定义背压控制
-AsyncPipeline pipeline(source, template, pool, consumer, 8, 32);
-// 最多 32 个数据包同时在处理
+AsyncPipeline pipeline(source, template, pool, consumer, 16, 15);
+// 最多 15 个数据包同时在处理
 ```
 
 ---
@@ -499,58 +511,6 @@ LOG.setLevel(GryFlux::LogLevel::ERROR);  // 只显示错误
 [INFO ] Packet 0: ✓ PASS (sum = 3840.0, expected = 3840.0)
 [INFO ] Consumer thread completed, consumed 100 packets
 ```
-
----
-
-## 🚀 适用场景
-
-### 1. 嵌入式 AI 推理
-
-**典型应用**：
-- 智能摄像头（目标检测 + 跟踪）
-- 自动驾驶（多传感器融合）
-- 工业视觉（缺陷检测）
-
-**优势**：
-- 自动管理 NPU/DSP 资源
-- 多模型并行推理
-- 低延迟、高吞吐
-
-### 2. 实时视频处理
-
-**典型应用**：
-- 视频编解码
-- 实时滤镜
-- 目标跟踪
-
-**优势**：
-- 流式处理（Source → Graph → Consumer）
-- 背压控制（防止内存爆炸）
-- 多帧并行处理
-
-### 3. 传感器融合
-
-**典型应用**：
-- 激光雷达 + 摄像头融合
-- IMU + GPS 融合
-- 多传感器时间对齐
-
-**优势**：
-- 并行分支处理
-- 融合节点（多输入）
-- 事件驱动调度
-
-### 4. 边缘计算
-
-**典型应用**：
-- IoT 边缘节点
-- 5G MEC
-- 智能网关
-
-**优势**：
-- CPU + 硬件加速器混合
-- 资源受限环境优化
-- 低功耗设计
 
 ---
 

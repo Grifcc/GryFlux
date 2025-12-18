@@ -17,8 +17,7 @@ void ImagePreprocessNode::execute(GryFlux::DataPacket &packet, GryFlux::Context 
     auto &p = static_cast<SimpleDataPacket &>(packet);
 
     // ImagePreprocess: preprocessedVec[i] = rawVec[i] * 2
-    p.preprocessedVec.resize(p.rawVec.size());
-    for (size_t i = 0; i < p.rawVec.size(); ++i)
+    for (size_t i = 0; i < p.preprocessedVec.size(); ++i)
     {
         p.preprocessedVec[i] = p.rawVec[i] * 2.0f;
     }

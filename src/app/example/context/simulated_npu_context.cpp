@@ -5,8 +5,11 @@
  *************************************************************************************************************************/
 #include "simulated_npu_context.h"
 #include "utils/logger.h"
+#include <algorithm>
+#include <stdexcept>
 
-SimulatedNPUContext::SimulatedNPUContext(int deviceId) : deviceId_(deviceId)
+SimulatedNPUContext::SimulatedNPUContext(int deviceId)
+    : deviceId_(deviceId), deviceMemory_(kVecSize)
 {
     LOG.info("SimulatedNPU %d initialized", deviceId_);
 }
@@ -19,7 +22,11 @@ SimulatedNPUContext::~SimulatedNPUContext()
 void SimulatedNPUContext::copyToDevice(const std::vector<float> &hostData)
 {
     // 模拟 Host -> Device 数据传输 (DMA / PCIe)
-    deviceMemory_ = hostData;
+    if (hostData.size() != deviceMemory_.size())
+    {
+        throw std::runtime_error("copyToDevice(hostData): hostData size mismatch");
+    }
+    std::copy(hostData.begin(), hostData.end(), deviceMemory_.begin());
 
     // 模拟数据传输延迟（真实场景：PCIe Gen3 x16 约 15 GB/s）
     // 对于 256 * 4 bytes = 1 KB 数据，延迟约 0.07 微秒
@@ -49,16 +56,26 @@ void SimulatedNPUContext::runCompute(float offset)
 
 std::vector<float> SimulatedNPUContext::copyFromDevice()
 {
+    std::vector<float> result(deviceMemory_.size());
+    copyFromDevice(result);
+    return result;
+}
+
+void SimulatedNPUContext::copyFromDevice(std::vector<float> &hostOut)
+{
+    if (hostOut.size() != deviceMemory_.size())
+    {
+        throw std::runtime_error("copyFromDevice(hostOut): hostOut size mismatch");
+    }
+
     // 模拟 Device -> Host 数据传输
-    std::vector<float> result = deviceMemory_;
+    std::copy(deviceMemory_.begin(), deviceMemory_.end(), hostOut.begin());
 
     // 模拟数据传输延迟
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
     LOG.debug("NPU %d: Copied %zu elements from device memory",
-             deviceId_, result.size());
-
-    return result;
+             deviceId_, hostOut.size());
 }
 
 void SimulatedNPUContext::runInference()

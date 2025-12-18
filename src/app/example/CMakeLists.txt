@@ -3,6 +3,7 @@ add_executable(simple_pipeline_example
     simple_pipeline_example.cpp
     # Context resources
     context/simulated_npu_context.cpp
+    context/simulated_tracker_context.cpp
     # Data packets
     packet/simple_data_packet.cpp
     # Task nodes

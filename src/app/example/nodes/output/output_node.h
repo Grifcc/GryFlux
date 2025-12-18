@@ -13,7 +13,7 @@ namespace PipelineNodes
 {
 
 /**
- * @brief Object Tracker Node - 目标跟踪（CPU任务）
+ * @brief Object Tracker Node - 目标跟踪（依赖跨帧状态）
  *
  * 变换：trackValue = detectionValue + featureValue
  *
@@ -22,6 +22,15 @@ namespace PipelineNodes
  * - FeatExtractorNode（特征结果）
  */
 class ObjectTrackerNode : public GryFlux::NodeBase
+{
+public:
+    void execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx) override;
+};
+
+/**
+ * @brief Final output node - 标记完成（不做数据变换）
+ */
+class FinalOutputNode : public GryFlux::NodeBase
 {
 public:
     void execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx) override;

@@ -25,21 +25,24 @@ public:
     explicit SimpleDataSource(size_t totalPackets)
         : totalPackets_(totalPackets), producedCount_(0)
     {
+        setHasMore(totalPackets_ > 0);
     }
 
     std::unique_ptr<GryFlux::DataPacket> produce() override
     {
+        if (producedCount_ >= totalPackets_)
+        {
+            setHasMore(false);
+            return nullptr;
+        }
+
         auto packet = std::make_unique<SimpleDataPacket>();
         packet->id = static_cast<int>(producedCount_);
         // value 会在 InputNode 中初始化为 id
 
         producedCount_++;
+        setHasMore(producedCount_ < totalPackets_);
         return packet;
-    }
-
-    bool hasMore() override
-    {
-        return producedCount_ < totalPackets_;
     }
 
 private:

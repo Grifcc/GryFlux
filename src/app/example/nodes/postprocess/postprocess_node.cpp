@@ -17,8 +17,7 @@ void FeatExtractorNode::execute(GryFlux::DataPacket &packet, GryFlux::Context &c
     auto &p = static_cast<SimpleDataPacket &>(packet);
 
     // FeatExtractor: featureVec[i] = preprocessedVec[i] + 5
-    p.featureVec.resize(p.preprocessedVec.size());
-    for (size_t i = 0; i < p.preprocessedVec.size(); ++i)
+    for (size_t i = 0; i < p.featureVec.size(); ++i)
     {
         p.featureVec[i] = p.preprocessedVec[i] + 5.0f;
     }

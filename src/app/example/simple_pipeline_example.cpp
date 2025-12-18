@@ -41,6 +41,7 @@
 
 // Custom types
 #include "context/simulated_npu_context.h"
+#include "context/simulated_tracker_context.h"
 #include "packet/simple_data_packet.h"
 
 // Pipeline nodes
@@ -75,13 +76,17 @@ int main(int argc, char **argv)
 
     auto resourcePool = std::make_shared<GryFlux::ResourcePool>();
 
-    // Register 2 simulated NPUs
+    // Register 3 simulated NPUs
     resourcePool->registerResourceType("npu", {
                                                   std::make_shared<SimulatedNPUContext>(0),
                                                   std::make_shared<SimulatedNPUContext>(1),
                                                   std::make_shared<SimulatedNPUContext>(2)});
 
-    LOG.info("Registered 2 NPU resources");
+    LOG.info("Registered 3 NPU resources");
+
+    // Register 1 tracker resource (global singleton, cross-frame dependency)
+    resourcePool->registerResourceType("tracker", {std::make_shared<SimulatedTrackerContext>()});
+    LOG.info("Registered 1 Tracker resource (global singleton)");
 
     // -------------------- Step 2: Build Graph Template --------------------
 
@@ -103,7 +108,7 @@ int main(int argc, char **argv)
             builder->addTask<PipelineNodes::ObjectDetectionNode>(
                 "objectDetection",
                 "npu",     // Requires NPU resource
-                {"imagePreprocess"}  // Depends on input node (并行!)
+                {"input"}  // Depends on input node (并行!)
             );
 
             // FeatExtractor - Depends on ImagePreprocess
@@ -114,10 +119,16 @@ int main(int argc, char **argv)
             );
 
             // ObjectTracker - 融合节点 (depends on both branches)
-            builder->setOutputNode<PipelineNodes::ObjectTrackerNode>(
+            builder->addTask<PipelineNodes::ObjectTrackerNode>(
                 "objectTracker",
+                "tracker",  // Global singleton resource (cross-frame dependency)
                 {"objectDetection", "featExtractor"}  // Depends on both!
             );
+
+            // Output node - mark graph completed
+            builder->setOutputNode<PipelineNodes::FinalOutputNode>(
+                "output",
+                {"objectTracker"});
         });
 
    LOG.info("Transformation: track = (id + 10) + (id * 2 + 5) = 3 * id + 15");
@@ -146,8 +157,7 @@ int main(int argc, char **argv)
         graphTemplate,
         resourcePool,
         consumer,
-        12, // Thread pool size (maxActivePackets = 8 × 2 = 16 by default),
-        3
+        12, // Thread pool size (maxActivePackets = 8 - 1 = 7 by default),
     );
 
     // 启用 profiler（可通过命令行参数控制）

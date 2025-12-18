@@ -34,6 +34,8 @@
  */
 struct SimpleDataPacket : public GryFlux::DataPacket
 {
+    static constexpr size_t kVecSize = 256;
+
     int id;  // 数据包编号
 
     // 各节点的输出字段（避免并行节点冲突）
@@ -43,7 +45,15 @@ struct SimpleDataPacket : public GryFlux::DataPacket
     std::vector<float> featureVec;       // FeatExtractor 输出 (CPU)
     std::vector<float> trackVec;         // ObjectTracker 输出 (融合结果)
 
-    SimpleDataPacket() : id(0) {}
+    SimpleDataPacket()
+        : id(0),
+          rawVec(kVecSize),
+          preprocessedVec(kVecSize),
+          detectionVec(kVecSize),
+          featureVec(kVecSize),
+          trackVec(kVecSize)
+    {
+    }
 
     uint64_t getIdx() const override
     {

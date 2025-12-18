@@ -28,7 +28,7 @@ void ObjectDetectionNode::execute(GryFlux::DataPacket &packet, GryFlux::Context 
     npu.runCompute(10.0f);
 
     // 步骤 3: 拷贝结果回主机内存 (Device -> Host)
-    p.detectionVec = npu.copyFromDevice();
+    npu.copyFromDevice(p.detectionVec);
     // ===========================================================
 
     LOG.debug("Packet %d: ObjectDetection completed on NPU %d (result size = %zu)",

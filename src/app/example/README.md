@@ -7,7 +7,9 @@
 ### 处理流程
 
 ```
-Input → Preprocess(CPU) → Inference(NPU) → Postprocess(CPU) → Output
+  Input
+    ├─→ ImagePreprocess(CPU) ─→ FeatExtractor(CPU) ─┐
+    └─→ ObjectDetection(NPU) ───────────────────────→ ObjectTracker(Output)
 ```
 
 ### 运行结果分析
@@ -19,8 +21,8 @@ Throughput: 138.89 fps
 ```
 
 **关键观察：**
-1. **多帧并行处理** - 从日志可以看到多个Frame同时执行Preprocessing
-2. **NPU资源调度** - 2个NPU并行工作（Frame 2用NPU 0，Frame 1用NPU 1）
+1. **多帧并行处理** - 从日志可以看到多个Frame同时在不同节点执行
+2. **NPU资源调度** - 多个NPU并行工作（不同Frame使用不同NPU）
 3. **事件驱动调度** - 节点完成后立即触发后继节点，无需等待
 4. **高吞吐量** - 138.89 fps，远超单帧串行处理
 
@@ -70,37 +72,49 @@ resourcePool->registerResourceType("npu", {
 ### 4. 构建图模板
 
 ```cpp
-auto graphTemplate = GryFlux::GraphTemplate::buildOnce([](auto builder) {
-    builder->setInputNode("input", inputFunc);
-    builder->addTask("preprocess", preprocessFunc, "", {"input"});
-    builder->addTask("inference", inferenceFunc, "npu", {"preprocess"});
-    builder->addTask("postprocess", postprocessFunc, "", {"inference"});
-    builder->setOutputNode("output", outputFunc, {"postprocess"});
-});
+auto graphTemplate = GryFlux::GraphTemplate::buildOnce(
+    [](GryFlux::TemplateBuilder *builder)
+    {
+        builder->setInputNode<PipelineNodes::InputNode>("input");
+
+        // 并行分支 1（CPU）
+        builder->addTask<PipelineNodes::ImagePreprocessNode>(
+            "imagePreprocess", "", {"input"});
+        builder->addTask<PipelineNodes::FeatExtractorNode>(
+            "featExtractor", "", {"imagePreprocess"});
+
+        // 并行分支 2（NPU）
+        builder->addTask<PipelineNodes::ObjectDetectionNode>(
+            "objectDetection", "npu", {"input"});
+
+        // 跟踪节点：跨帧依赖，全局只能有一个（抽象为资源类型 "tracker"）
+        builder->addTask<PipelineNodes::ObjectTrackerNode>(
+            "objectTracker", "tracker", {"objectDetection", "featExtractor"});
+
+        // 输出节点：仅用于标记完成
+        builder->setOutputNode<PipelineNodes::FinalOutputNode>(
+            "output", {"objectTracker"});
+    });
 ```
 
 ### 5. 创建处理器并提交数据
 
 ```cpp
-auto processor = std::make_shared<GryFlux::AsyncGraphProcessor>(
-    graphTemplate, resourcePool, 8
+#include "framework/async_pipeline.h"
+
+auto source = std::make_shared<SimpleDataSource>(100);
+auto consumer = std::make_shared<ResultConsumer>();
+
+GryFlux::AsyncPipeline pipeline(
+    source,
+    graphTemplate,
+    resourcePool,
+    consumer,
+    12, // 线程池大小
+    16  // maxActivePackets（背压）
 );
 
-processor->start();
-
-// 提交多个数据包
-for (int i = 0; i < 10; ++i) {
-    auto packet = new SimpleDataPacket();
-    // ... 填充数据
-    processor->submitPacket(packet);
-}
-
-// 获取结果
-DataPacket* result;
-while (processor->tryGetOutput(result)) {
-    // ... 使用结果
-    delete result;
-}
+pipeline.run();
 ```
 
 ## 关键设计理念
@@ -109,9 +123,9 @@ while (processor->tryGetOutput(result)) {
 
 传统设计可能需要多个Worker线程从输入队列取数据，但在GryFlux中：
 
-- **数据包之间的并行** 已经通过 ThreadPool 和事件驱动调度实现
-- 用户直接调用 `submitPacket()` 提交数据包
-- 框架自动并行执行多个数据包
+- **数据包之间的并行** 通过 ThreadPool + 事件驱动调度自动实现
+- 使用 `AsyncPipeline` 时，框架会自动管理生产/消费线程并提供背压控制
+- 无需为“多帧并行”专门再建一层 Worker 线程池
 
 ### 图模板复用
 
@@ -160,9 +174,9 @@ resourcePool->registerResourceType("npu", {
 
 ```cpp
 // 分支处理
-builder->addTask("detect1", detectFunc1, "npu", {"preprocess"});
-builder->addTask("detect2", detectFunc2, "npu", {"preprocess"});
-builder->addTask("merge", mergeFunc, "", {"detect1", "detect2"});
+builder->addTask<DetectNode1>("detect1", "npu", {"preprocess"});
+builder->addTask<DetectNode2>("detect2", "npu", {"preprocess"});
+builder->addTask<MergeNode>("merge", "", {"detect1", "detect2"});
 ```
 
 ### 3. 动态调整
@@ -178,7 +192,7 @@ auto processor = std::make_shared<GryFlux::AsyncGraphProcessor>(
 ## 总结
 
 GryFlux框架提供：
-- ✅ 简洁的API（只需定义Context、DataPacket和任务函数）
+- ✅ 简洁的API（只需定义 Context、DataPacket 和 NodeBase 节点）
 - ✅ 自动并行（无需手动管理线程）
 - ✅ 资源管理（自动控制NPU/GPU等硬件并发度）
 - ✅ 高性能（图模板复用、预分配、事件驱动）

@@ -23,6 +23,8 @@
 class SimulatedNPUContext : public GryFlux::Context
 {
 private:
+    static constexpr size_t kVecSize = 256;
+
     int deviceId_;
     std::vector<float> deviceMemory_;  // 模拟 NPU 设备内存
 
@@ -56,6 +58,13 @@ public:
      * 在真实场景中，这会触发反向 DMA 传输。
      */
     std::vector<float> copyFromDevice();
+
+    /**
+     * @brief 模拟数据从 NPU 拷贝回主机内存 (Device -> Host)，写入预分配缓冲区
+     *
+     * @note hostOut 必须提前 resize 到正确大小（示例中由 DataPacket 构造函数预分配）。
+     */
+    void copyFromDevice(std::vector<float> &hostOut);
 
     /**
      * @brief 兼容旧版接口（已废弃，推荐使用三步法）
