@@ -133,8 +133,15 @@ namespace GryFlux
 
             if (packet)
             {
-                consumer_->consume(std::move(packet));
-                consumedCount++;
+                if (packet->isFailed())
+                {
+                    LOG.warning("Dropping failed packet id=%llu", static_cast<unsigned long long>(packet->getIdx()));
+                }
+                else
+                {
+                    consumer_->consume(std::move(packet));
+                    consumedCount++;
+                }
             }
             else
             {

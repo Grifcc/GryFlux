@@ -20,6 +20,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <atomic>
 #include <queue>
 #include <mutex>
 #include <condition_variable>
@@ -63,6 +64,20 @@ namespace GryFlux
          */
         std::shared_ptr<Context> acquire(const std::string &typeName,
                                           std::chrono::milliseconds timeout = std::chrono::seconds(10));
+
+        /**
+         * @brief 获取资源（可取消）
+         *
+         * 用于“协作式取消”：当数据包进入 failed 状态后，等待资源的线程可尽快退出，避免无意义地占用资源/线程。
+         *
+         * @param typeName 资源类型名称
+         * @param timeout 超时时间（0ms 表示无限等待，但仍会响应 cancelFlag）
+         * @param cancelFlag 取消标志指针（不可为空）；若为 true 则提前返回 nullptr（不记录超时 warning）
+         * @return 资源上下文，超时或取消返回 nullptr
+         */
+        std::shared_ptr<Context> acquire(const std::string &typeName,
+                                         std::chrono::milliseconds timeout,
+                                         const std::atomic<bool> *cancelFlag);
 
         /**
          * @brief 释放资源

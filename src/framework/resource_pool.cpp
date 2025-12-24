@@ -47,6 +47,13 @@ namespace GryFlux
     std::shared_ptr<Context> ResourcePool::acquire(const std::string &typeName,
                                                     std::chrono::milliseconds timeout)
     {
+        return acquire(typeName, timeout, nullptr);
+    }
+
+    std::shared_ptr<Context> ResourcePool::acquire(const std::string &typeName,
+                                                   std::chrono::milliseconds timeout,
+                                                   const std::atomic<bool> *cancelFlag)
+    {
         std::unique_lock<std::mutex> registryLock(resourceRegistryMutex_);
 
         auto it = resourceTypePools_.find(typeName);
@@ -62,18 +69,34 @@ namespace GryFlux
         // 等待资源可用
         std::unique_lock<std::mutex> poolLock(pool.poolMutex);
 
+        auto availableOrCanceled = [&pool, cancelFlag]()
+        {
+            if (!pool.availableContexts.empty())
+            {
+                return true;
+            }
+            return cancelFlag && cancelFlag->load(std::memory_order_acquire);
+        };
+
         // timeout == 0 => block indefinitely (resource pool acts as concurrency limiter)
         if (timeout == std::chrono::milliseconds::zero())
         {
-            pool.availabilityCondition.wait(poolLock, [&pool]()
-                                             { return !pool.availableContexts.empty(); });
+            pool.availabilityCondition.wait(poolLock, availableOrCanceled);
         }
-        else if (!pool.availabilityCondition.wait_for(poolLock, timeout,
-                                                       [&pool]()
-                                                       { return !pool.availableContexts.empty(); }))
+        else if (!pool.availabilityCondition.wait_for(poolLock, timeout, availableOrCanceled))
         {
             // 超时
             LOG.warning("Timeout acquiring resource '%s'", typeName.c_str());
+            return nullptr;
+        }
+
+        if (cancelFlag && cancelFlag->load(std::memory_order_acquire))
+        {
+            return nullptr;
+        }
+
+        if (pool.availableContexts.empty())
+        {
             return nullptr;
         }
 

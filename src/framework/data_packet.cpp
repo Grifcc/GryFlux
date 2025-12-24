@@ -24,6 +24,7 @@ namespace GryFlux
     {
         executionState_.graphTemplate = tmpl;
         executionState_.isGraphCompleted.store(false, std::memory_order_relaxed);
+        executionState_.hasFailed.store(false, std::memory_order_relaxed);
 
         // 使用 unique_ptr 避免移动/拷贝 atomic 成员
         executionState_.nodeStates.clear();
@@ -85,6 +86,16 @@ namespace GryFlux
     bool DataPacket::isCompleted() const
     {
         return executionState_.isGraphCompleted.load(std::memory_order_acquire);
+    }
+
+    bool DataPacket::isFailed() const
+    {
+        return executionState_.hasFailed.load(std::memory_order_acquire);
+    }
+
+    void DataPacket::markFailed()
+    {
+        executionState_.hasFailed.store(true, std::memory_order_release);
     }
 
 } // namespace GryFlux

@@ -31,7 +31,8 @@ namespace GryFlux
      * @brief 任务调度器 - 无状态的执行器
      *
      * 执行节点任务，管理资源获取，触发后继节点调度。
-     * 注意：TaskScheduler 不拥有 DataPacket 生命周期；失败/完成由回调交给上层处理。
+     * 注意：TaskScheduler 不拥有 DataPacket 生命周期；仅通过完成回调把输出交给上层。
+     * 错误状态通过 DataPacket::markFailed() 进行传播，后继节点会跳过 execute/资源获取并快速推进到输出节点。
      */
     class TaskScheduler
         : private NonCopyableNonMovable
@@ -48,14 +49,6 @@ namespace GryFlux
          * @param callback 回调函数
          */
         void setCompletionCallback(std::function<void(DataPacket *)> callback);
-
-        /**
-         * @brief 设置数据包失败回调
-         *
-         * 当某个节点执行失败或资源获取失败时触发。
-         * @param callback 回调函数
-         */
-        void setFailureCallback(std::function<void(DataPacket *)> callback);
 
         /**
          * @brief 设置资源获取超时时间
@@ -82,14 +75,6 @@ namespace GryFlux
         void executeNodeChain(DataPacket *packet, size_t nodeIndex);
 
         /**
-         * @brief 节点执行失败回调
-         *
-         * @param packet 数据包
-         * @param nodeIndex 节点索引
-         */
-        void onNodeFailed(DataPacket *packet, size_t nodeIndex);
-
-        /**
          * @brief 图执行完成回调
          *
          * @param packet 数据包
@@ -100,7 +85,6 @@ namespace GryFlux
         std::shared_ptr<ThreadPool> threadPool_;
         std::chrono::milliseconds resourceAcquireTimeout_;
         std::function<void(DataPacket *)> completionCallback_;
-        std::function<void(DataPacket *)> failureCallback_;
     };
 
 } // namespace GryFlux

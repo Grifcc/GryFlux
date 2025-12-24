@@ -59,6 +59,9 @@ namespace GryFlux
         {
             std::shared_ptr<GraphTemplate> graphTemplate;
 
+            // Packet-level state
+            std::atomic<bool> hasFailed{false};
+
             // 每个节点的运行时状态
             struct NodeState
             {
@@ -113,6 +116,16 @@ namespace GryFlux
          * @return true 如果图执行完成
          */
         bool isCompleted() const;
+
+        /**
+         * @brief 检查数据包是否已失败
+         */
+        bool isFailed() const;
+
+        /**
+         * @brief 标记数据包失败
+         */
+        void markFailed();
     };
 
 } // namespace GryFlux

@@ -67,15 +67,6 @@ namespace GryFlux
                 activePackets_.erase(it);
             } });
 
-        // 设置失败回调 - 释放 activePackets_ 所有权，避免卡住/泄漏
-        scheduler_->setFailureCallback([this](DataPacket *packet)
-                                        {
-            std::lock_guard<std::mutex> lock(activePacketsMutex_);
-            auto it = activePackets_.find(packet);
-            if (it != activePackets_.end()) {
-                activePackets_.erase(it);
-            } });
-
         LOG.info("AsyncGraphProcessor created with thread pool size %zu, max active packets %zu",
                  poolSize, maxActivePackets_);
     }
