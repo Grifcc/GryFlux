@@ -185,6 +185,7 @@ namespace GryFlux
             size_t started = 0;
             size_t finished = 0;
             size_t failed = 0;
+            size_t skipped = 0;
             uint64_t totalDuration = 0;
         };
 
@@ -210,6 +211,9 @@ namespace GryFlux
                 entry.failed++;
                 entry.totalDuration += evt.durationNs;
                 break;
+            case Profiling::EventType::Skipped:
+                entry.skipped++;
+                break;
             }
         }
 
@@ -219,12 +223,13 @@ namespace GryFlux
             double avgMs = entry.finished > 0 ? (entry.totalDuration / static_cast<double>(entry.finished)) / 1'000'000.0 : 0.0;
             double totalMs = entry.totalDuration / 1'000'000.0;
 
-            LOG.info("节点 %s => scheduled=%zu started=%zu finished=%zu failed=%zu avg=%.3f ms total=%.3f ms",
+            LOG.info("节点 %s => scheduled=%zu started=%zu finished=%zu failed=%zu skipped=%zu avg=%.3f ms total=%.3f ms",
                      node.c_str(),
                      entry.scheduled,
                      entry.started,
                      entry.finished,
                      entry.failed,
+                     entry.skipped,
                      avgMs,
                      totalMs);
         }

@@ -425,6 +425,11 @@ make -j8 && ./src/app/example/simple_pipeline_example
 - **统计汇总**：每个节点的执行次数/平均耗时等
 - **时间线（JSON）**：可视化每个数据包在各节点上的执行区间
 
+事件类型说明（时间线 JSON）：
+- `finished`：节点正常执行完成
+- `failed`：节点执行失败（异常/资源获取失败等）
+- `skipped`：数据包已失败，节点被动跳过（用于“失败后快进到 output”的场景）
+
 0) 编译时启用（build-time）
 
 Profiler 默认不编译进二进制；需要在编译时打开开关并重新编译：
@@ -455,13 +460,7 @@ pipeline.dumpProfilingTimeline("graph_timeline.json");
 
 2) 把 `graph_timeline.json` 转成可视化 HTML
 
-```bash
-python3 -m pip install pandas plotly
-python3 scripts/plot_graph_timeline.py --input graph_timeline.json --output timeline.html
-```
-
-说明：
-- 数据包很多时建议用 `--limit-packets N` 或调小 `--packets-per-page`，避免页面过重。
+TODO
 
 ---
 

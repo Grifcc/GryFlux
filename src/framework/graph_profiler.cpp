@@ -122,6 +122,27 @@ namespace GryFlux
         events_.push_back(std::move(event));
     }
 
+    void GraphProfiler::recordNodeSkipped(DataPacket *packet, const std::string &nodeId)
+    {
+        if (!isEnabled())
+        {
+            return;
+        }
+
+        uint64_t packetId = packet ? packet->getIdx() : 0;
+
+        Event event{
+            EventType::Skipped,
+            nowSystemNs(),
+            nodeId,
+            packetId,
+            threadIdString(),
+            0};
+
+        std::lock_guard<std::mutex> lock(mutex_);
+        events_.push_back(std::move(event));
+    }
+
     std::vector<GraphProfiler::Event> GraphProfiler::snapshotEvents() const
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -155,6 +176,8 @@ namespace GryFlux
                     return "finished";
                 case EventType::Failed:
                     return "failed";
+                case EventType::Skipped:
+                    return "skipped";
                 }
                 return "unknown";
             })()

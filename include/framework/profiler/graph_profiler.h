@@ -25,7 +25,8 @@ namespace GryFlux
             Scheduled,
             Started,
             Finished,
-            Failed
+            Failed,
+            Skipped
         };
 
         struct Event
@@ -49,6 +50,7 @@ namespace GryFlux
         void recordNodeStarted(DataPacket *packet, const std::string &nodeId);
         void recordNodeFinished(DataPacket *packet, const std::string &nodeId, uint64_t durationNs);
         void recordNodeFailed(DataPacket *packet, const std::string &nodeId, uint64_t durationNs);
+        void recordNodeSkipped(DataPacket *packet, const std::string &nodeId);
 
         std::vector<Event> snapshotEvents() const;
         void dumpTimelineJson(const std::string &filePath) const;

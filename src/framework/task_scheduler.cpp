@@ -80,49 +80,59 @@ namespace GryFlux
 
             // If the packet has failed, we still fast-forward the DAG to keep graph integrity,
             // but we skip resource acquisition and node execution.
-            if (!packetFailed && !node.resourceTypeName.empty())
+            if (packetFailed)
             {
-                ctx = resourcePool_->acquire(node.resourceTypeName,
-                                             resourceAcquireTimeout_,
-                                             &packet->executionState_.hasFailed);
+                if constexpr (Profiling::kBuildProfiling)
+                {
+                    Profiling::recordNodeSkipped(packet, node.nodeId);
+                }
             }
-
-            Profiling::NodeScope execScope(packet, node.nodeId);
-
-            if (!packetFailed && !packet->executionState_.hasFailed.load(std::memory_order_acquire))
+            else
             {
-                if (!node.nodeImpl)
+                if (!node.resourceTypeName.empty())
                 {
-                    execScope.markFailed();
-                    LOG.error("Node '%s' (index %zu) implementation is null", node.nodeId.c_str(), currentIndex);
-                    packet->markFailed();
+                    ctx = resourcePool_->acquire(node.resourceTypeName,
+                                                 resourceAcquireTimeout_,
+                                                 &packet->executionState_.hasFailed);
                 }
-                else if (!node.resourceTypeName.empty() && !ctx)
+
+                Profiling::NodeScope execScope(packet, node.nodeId);
+
+                if (!packet->executionState_.hasFailed.load(std::memory_order_acquire))
                 {
-                    execScope.markFailed();
-                    LOG.error("Failed to acquire resource '%s' for node '%s' (index %zu)",
-                              node.resourceTypeName.c_str(), node.nodeId.c_str(), currentIndex);
-                    packet->markFailed();
-                }
-                else
-                {
-                    try
-                    {
-                        if (ctx)
-                        {
-                            node.nodeImpl->execute(*packet, *ctx);
-                        }
-                        else
-                        {
-                            node.nodeImpl->execute(*packet, None::instance());
-                        }
-                    }
-                    catch (const std::exception &e)
+                    if (!node.nodeImpl)
                     {
                         execScope.markFailed();
-                        LOG.error("Node '%s' (index %zu) execution failed: %s",
-                                  node.nodeId.c_str(), currentIndex, e.what());
+                        LOG.error("Node '%s' (index %zu) implementation is null", node.nodeId.c_str(), currentIndex);
                         packet->markFailed();
+                    }
+                    else if (!node.resourceTypeName.empty() && !ctx)
+                    {
+                        execScope.markFailed();
+                        LOG.error("Failed to acquire resource '%s' for node '%s' (index %zu)",
+                                  node.resourceTypeName.c_str(), node.nodeId.c_str(), currentIndex);
+                        packet->markFailed();
+                    }
+                    else
+                    {
+                        try
+                        {
+                            if (ctx)
+                            {
+                                node.nodeImpl->execute(*packet, *ctx);
+                            }
+                            else
+                            {
+                                node.nodeImpl->execute(*packet, None::instance());
+                            }
+                        }
+                        catch (const std::exception &e)
+                        {
+                            execScope.markFailed();
+                            LOG.error("Node '%s' (index %zu) execution failed: %s",
+                                      node.nodeId.c_str(), currentIndex, e.what());
+                            packet->markFailed();
+                        }
                     }
                 }
             }

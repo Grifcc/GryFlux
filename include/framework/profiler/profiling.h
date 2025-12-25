@@ -125,6 +125,19 @@ namespace GryFlux
             }
         }
 
+        inline void recordNodeSkipped(DataPacket *packet, const std::string &nodeId)
+        {
+            if constexpr (kBuildProfiling)
+            {
+                GraphProfiler::instance().recordNodeSkipped(packet, nodeId);
+            }
+            else
+            {
+                (void)packet;
+                (void)nodeId;
+            }
+        }
+
         inline std::vector<Event> snapshotEvents()
         {
             if constexpr (kBuildProfiling)
