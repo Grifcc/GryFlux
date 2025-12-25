@@ -58,15 +58,13 @@ public:
      * @param consumer 数据消费者
      * @param threadPoolSize 线程池大小（0表示自动）
      * @param maxActivePackets 最大活跃数据包数（0表示自动：threadPoolSize - 1）
-     * @param resourceAcquireTimeout 资源获取超时时间（0ms 表示无限等待）
-     */
+    */
     AsyncPipeline(std::shared_ptr<DataSource> source,
                   std::shared_ptr<GraphTemplate> graphTemplate,
                   std::shared_ptr<ResourcePool> resourcePool,
                   std::shared_ptr<DataConsumer> consumer,
                   size_t threadPoolSize = 0,
-                  size_t maxActivePackets = 0,
-                  std::chrono::milliseconds resourceAcquireTimeout = std::chrono::milliseconds(0));
+                  size_t maxActivePackets = 0);
 
     ~AsyncPipeline();
 
@@ -126,7 +124,6 @@ private:
     std::shared_ptr<DataSource> source_;
     std::shared_ptr<DataConsumer> consumer_;
     std::shared_ptr<AsyncGraphProcessor> processor_;
-    std::chrono::milliseconds resourceAcquireTimeout_;
 
     std::thread producerThread_;
     std::thread consumerThread_;

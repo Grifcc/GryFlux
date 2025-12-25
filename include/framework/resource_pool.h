@@ -49,16 +49,28 @@ namespace GryFlux
          *
          * @param typeName 资源类型名称（如 "npu", "tracker" 等）
          * @param instances 资源实例列表
+         * @param acquireTimeout 资源获取超时时间（0ms 表示无限等待）
          */
         void registerResourceType(const std::string &typeName,
-                                   std::vector<std::shared_ptr<Context>> instances);
+                                   std::vector<std::shared_ptr<Context>> instances,
+                                   std::chrono::milliseconds acquireTimeout = std::chrono::milliseconds(0));
+
+        /**
+         * @brief 设置某个资源类型的获取超时时间（0ms 表示无限等待）
+         */
+        void setAcquireTimeout(const std::string &typeName, std::chrono::milliseconds acquireTimeout);
+
+        /**
+         * @brief 获取某个资源类型的获取超时时间（未设置则返回 0ms）
+         */
+        std::chrono::milliseconds getAcquireTimeout(const std::string &typeName) const;
 
         /**
          * @brief 获取资源（阻塞直到可用或超时）
          *
          * @param typeName 资源类型名称
          * @param timeout 超时时间
-         *        - timeout == 0ms：无限等待（推荐用于仅作为并发度限制器的场景）
+         *        - timeout == 0ms：无限等待
          *        - timeout  > 0ms：等待直到超时返回 nullptr
          * @return 资源上下文，超时返回 nullptr
          */
@@ -100,6 +112,7 @@ namespace GryFlux
         {
             std::queue<std::shared_ptr<Context>> availableContexts;
             std::vector<std::shared_ptr<Context>> allContexts;
+            std::chrono::milliseconds acquireTimeout{std::chrono::milliseconds(0)};
             std::mutex poolMutex;
             std::condition_variable availabilityCondition;
         };

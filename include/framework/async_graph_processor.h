@@ -53,13 +53,11 @@ namespace GryFlux
          * @param resourcePool 资源池
          * @param threadPoolSize 线程池大小（0表示使用硬件并发数）
          * @param maxActivePackets 最大活跃数据包数（0表示自动：threadPoolSize - 1，且最小为 1）
-         * @param resourceAcquireTimeout 资源获取超时时间（0ms 表示无限等待）
          */
         AsyncGraphProcessor(std::shared_ptr<GraphTemplate> graphTemplate,
                             std::shared_ptr<ResourcePool> resourcePool,
                             size_t threadPoolSize = 0,
-                            size_t maxActivePackets = 0,
-                            std::chrono::milliseconds resourceAcquireTimeout = std::chrono::milliseconds(0));
+                            size_t maxActivePackets = 0);
 
         ~AsyncGraphProcessor();
 

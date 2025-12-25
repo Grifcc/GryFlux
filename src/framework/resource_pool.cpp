@@ -21,7 +21,8 @@ namespace GryFlux
 {
 
     void ResourcePool::registerResourceType(const std::string &typeName,
-                                             std::vector<std::shared_ptr<Context>> instances)
+                                            std::vector<std::shared_ptr<Context>> instances,
+                                            std::chrono::milliseconds acquireTimeout)
     {
         std::lock_guard<std::mutex> lock(resourceRegistryMutex_);
 
@@ -33,6 +34,7 @@ namespace GryFlux
 
         auto &pool = resourceTypePools_[typeName];
         pool.allContexts = std::move(instances);
+        pool.acquireTimeout = acquireTimeout;
 
         // 初始化可用队列
         for (auto &ctx : pool.allContexts)
@@ -42,6 +44,29 @@ namespace GryFlux
 
         LOG.info("Registered resource type '%s' with %zu instances",
                  typeName.c_str(), pool.allContexts.size());
+    }
+
+    void ResourcePool::setAcquireTimeout(const std::string &typeName, std::chrono::milliseconds acquireTimeout)
+    {
+        std::lock_guard<std::mutex> lock(resourceRegistryMutex_);
+        auto it = resourceTypePools_.find(typeName);
+        if (it == resourceTypePools_.end())
+        {
+            LOG.error("Resource type '%s' not registered (setAcquireTimeout)", typeName.c_str());
+            return;
+        }
+        it->second.acquireTimeout = acquireTimeout;
+    }
+
+    std::chrono::milliseconds ResourcePool::getAcquireTimeout(const std::string &typeName) const
+    {
+        std::lock_guard<std::mutex> lock(resourceRegistryMutex_);
+        auto it = resourceTypePools_.find(typeName);
+        if (it == resourceTypePools_.end())
+        {
+            return std::chrono::milliseconds(0);
+        }
+        return it->second.acquireTimeout;
     }
 
     std::shared_ptr<Context> ResourcePool::acquire(const std::string &typeName,

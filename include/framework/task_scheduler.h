@@ -51,13 +51,6 @@ namespace GryFlux
         void setCompletionCallback(std::function<void(DataPacket *)> callback);
 
         /**
-         * @brief 设置资源获取超时时间
-         *
-         * @param timeout 超时时间
-         */
-        void setResourceAcquireTimeout(std::chrono::milliseconds timeout);
-
-        /**
          * @brief 调度节点（提交到线程池）
          *
          * @param packet 数据包
@@ -83,7 +76,6 @@ namespace GryFlux
 
         std::shared_ptr<ResourcePool> resourcePool_;
         std::shared_ptr<ThreadPool> threadPool_;
-        std::chrono::milliseconds resourceAcquireTimeout_;
         std::function<void(DataPacket *)> completionCallback_;
     };
 

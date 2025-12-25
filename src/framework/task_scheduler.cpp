@@ -26,18 +26,13 @@ namespace GryFlux
 {
     TaskScheduler::TaskScheduler(std::shared_ptr<ResourcePool> resourcePool,
                                    std::shared_ptr<ThreadPool> threadPool)
-        : resourcePool_(resourcePool), threadPool_(threadPool), resourceAcquireTimeout_(std::chrono::milliseconds(0))
+        : resourcePool_(resourcePool), threadPool_(threadPool)
     {
     }
 
     void TaskScheduler::setCompletionCallback(std::function<void(DataPacket *)> callback)
     {
         completionCallback_ = callback;
-    }
-
-    void TaskScheduler::setResourceAcquireTimeout(std::chrono::milliseconds timeout)
-    {
-        resourceAcquireTimeout_ = timeout;
     }
 
     void TaskScheduler::scheduleNode(DataPacket *packet, size_t nodeIndex)
@@ -91,8 +86,10 @@ namespace GryFlux
             {
                 if (!node.resourceTypeName.empty())
                 {
+                    const auto timeout = resourcePool_ ? resourcePool_->getAcquireTimeout(node.resourceTypeName)
+                                                       : std::chrono::milliseconds(0);
                     ctx = resourcePool_->acquire(node.resourceTypeName,
-                                                 resourceAcquireTimeout_,
+                                                 timeout,
                                                  &packet->executionState_.hasFailed);
                 }
 
