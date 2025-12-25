@@ -458,9 +458,11 @@ pipeline.printProfilingStats();
 pipeline.dumpProfilingTimeline("graph_timeline.json");
 ```
 
-2) 把 `graph_timeline.json` 转成可视化 HTML
+2) 把 `graph_timeline.json` 转成可视化 HTML(在线 Viewer, 支持筛选 packet / 节点)
 
-TODO
+
+- 打开：`http://profile.grifcc.top:8076/`
+- 上传 `graph_timeline.json`
 
 ---
 
