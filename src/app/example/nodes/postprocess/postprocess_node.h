@@ -1,7 +1,7 @@
 /*************************************************************************************************************************
  * Copyright 2025 Sunhaihua1
  *
- * GryFlux Framework - Input Node
+ * GryFlux Framework - Feature Extractor Node
  *************************************************************************************************************************/
 #pragma once
 
@@ -13,25 +13,15 @@ namespace PipelineNodes
 {
 
 /**
- * @brief Input node - Entry point of the pipeline
+ * @brief Feature Extractor Node - 特征提取（CPU任务）
  *
- * This node marks the beginning of data packet processing.
- * Typically used for logging or initial validation.
+ * 变换：featureValue = preprocessedValue + 5
+ *
+ * 依赖 ImagePreprocessNode 的输出。
  */
-class InputNode : public GryFlux::NodeBase
+class FeatExtractorNode : public GryFlux::NodeBase
 {
 public:
-    /**
-     * @brief Default constructor
-     */
-    InputNode() = default;
-
-    /**
-     * @brief Execute input node logic
-     *
-     * @param packet Data packet reference (borrow, not own)
-     * @param ctx Context reference (NullContext for CPU tasks)
-     */
     void execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx) override;
 };
 

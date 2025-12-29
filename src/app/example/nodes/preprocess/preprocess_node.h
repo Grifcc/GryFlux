@@ -1,7 +1,7 @@
 /*************************************************************************************************************************
  * Copyright 2025 Sunhaihua1
  *
- * GryFlux Framework - Input Node
+ * GryFlux Framework - Preprocess Node
  *************************************************************************************************************************/
 #pragma once
 
@@ -13,25 +13,15 @@ namespace PipelineNodes
 {
 
 /**
- * @brief Input node - Entry point of the pipeline
+ * @brief Image Preprocess Node - 图像预处理（CPU任务）
  *
- * This node marks the beginning of data packet processing.
- * Typically used for logging or initial validation.
+ * 变换：preprocessedValue = rawValue * 2
+ *
+ * 这个节点与 ObjectDetectionNode 并行执行！
  */
-class InputNode : public GryFlux::NodeBase
+class ImagePreprocessNode : public GryFlux::NodeBase
 {
 public:
-    /**
-     * @brief Default constructor
-     */
-    InputNode() = default;
-
-    /**
-     * @brief Execute input node logic
-     *
-     * @param packet Data packet reference (borrow, not own)
-     * @param ctx Context reference (NullContext for CPU tasks)
-     */
     void execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx) override;
 };
 
