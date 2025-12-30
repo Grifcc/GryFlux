@@ -19,7 +19,7 @@
 #include "framework/node_base.h"
 #include "framework/profiler/profiling.h"
 #include "utils/logger.h"
-#include <deque>
+#include <vector>
 #include <stdexcept>
 
 namespace GryFlux
@@ -35,141 +35,134 @@ namespace GryFlux
         completionCallback_ = callback;
     }
 
-    void TaskScheduler::scheduleNode(DataPacket *packet, size_t nodeIndex)
+    void TaskScheduler::scheduleNode(DataPacket *packet, size_t nodeIndex, ThreadPool::Priority priority)
     {
         if (!packet || packet->executionState_.isGraphCompleted.load(std::memory_order_acquire))
         {
             return;
         }
 
+        // 默认使用 packet idx 作为主优先级，确保小 idx 的包优先完成。
+        const ThreadPool::Priority packetPriority =
+            (priority != 0) ? priority : static_cast<ThreadPool::Priority>(packet->getIdx());
+
         if constexpr (Profiling::kBuildProfiling)
         {
             Profiling::recordNodeScheduled(packet, packet->executionState_.graphTemplate->getTask(nodeIndex).nodeId);
         }
 
-        threadPool_->enqueue([this, packet, nodeIndex]()
-                              { executeNodeChain(packet, nodeIndex); });
+        threadPool_->enqueue(packetPriority, [this, packet, nodeIndex, packetPriority]()
+                             { executeNode(packet, nodeIndex, packetPriority); });
     }
 
-    void TaskScheduler::executeNodeChain(DataPacket *packet, size_t nodeIndex)
+    void TaskScheduler::executeNode(DataPacket *packet, size_t nodeIndex, ThreadPool::Priority priority)
     {
         auto &tmpl = packet->executionState_.graphTemplate;
+        auto &node = tmpl->getTask(nodeIndex);
 
-        std::deque<size_t> readyQueue;
-        readyQueue.push_back(nodeIndex);
-
-        while (!readyQueue.empty())
+        if (packet->executionState_.isGraphCompleted.load(std::memory_order_acquire))
         {
-            if (packet->executionState_.isGraphCompleted.load(std::memory_order_acquire))
+            return;
+        }
+
+        std::shared_ptr<Context> ctx;
+
+        const bool packetFailed = packet->executionState_.hasFailed.load(std::memory_order_acquire);
+
+        // 如果 packet 已失败：跳过资源获取与执行，但仍推进 DAG，保证最终能到达 output 节点。
+        if (packetFailed)
+        {
+            if constexpr (Profiling::kBuildProfiling)
             {
-                return;
+                Profiling::recordNodeSkipped(packet, node.nodeId);
+            }
+        }
+        else
+        {
+            if (!node.resourceTypeName.empty())
+            {
+                const auto timeout = resourcePool_ ? resourcePool_->getAcquireTimeout(node.resourceTypeName)
+                                                   : std::chrono::milliseconds(0);
+                ctx = resourcePool_->acquire(node.resourceTypeName, timeout, &packet->executionState_.hasFailed);
             }
 
-            size_t currentIndex = readyQueue.front();
-            readyQueue.pop_front();
+            Profiling::NodeScope execScope(packet, node.nodeId);
 
-            auto &node = tmpl->getTask(currentIndex);
-            std::shared_ptr<Context> ctx;
+            if (!packet->executionState_.hasFailed.load(std::memory_order_acquire))
+            {
+                if (!node.nodeImpl)
+                {
+                    execScope.markFailed();
+                    LOG.error("Node '%s' (index %zu) implementation is null", node.nodeId.c_str(), nodeIndex);
+                    packet->markFailed();
+                }
+                else if (!node.resourceTypeName.empty() && !ctx)
+                {
+                    execScope.markFailed();
+                    LOG.error("Failed to acquire resource '%s' for node '%s' (index %zu)",
+                              node.resourceTypeName.c_str(), node.nodeId.c_str(), nodeIndex);
+                    packet->markFailed();
+                }
+                else
+                {
+                    try
+                    {
+                        if (ctx)
+                        {
+                            node.nodeImpl->execute(*packet, *ctx);
+                        }
+                        else
+                        {
+                            node.nodeImpl->execute(*packet, None::instance());
+                        }
+                    }
+                    catch (const std::exception &e)
+                    {
+                        execScope.markFailed();
+                        LOG.error("Node '%s' (index %zu) execution failed: %s",
+                                  node.nodeId.c_str(), nodeIndex, e.what());
+                        packet->markFailed();
+                    }
+                }
+            }
+        }
 
-            const bool packetFailed = packet->executionState_.hasFailed.load(std::memory_order_acquire);
+        // Always release the resource (if acquired), even if the packet has failed.
+        if (ctx)
+        {
+            resourcePool_->release(node.resourceTypeName, ctx);
+        }
 
-            // If the packet has failed, we still fast-forward the DAG to keep graph integrity,
-            // but we skip resource acquisition and node execution.
-            if (packetFailed)
+        // Always advance the DAG so the output node can be reached.
+        packet->markNodeCompleted(nodeIndex);
+
+        std::vector<std::function<void()>> successorTasks;
+        successorTasks.reserve(node.childIndices.size());
+
+        for (size_t succIdx : node.childIndices)
+        {
+            packet->notifyPredecessorCompleted(succIdx);
+
+            if (packet->tryMarkNodeReady(succIdx))
             {
                 if constexpr (Profiling::kBuildProfiling)
                 {
-                    Profiling::recordNodeSkipped(packet, node.nodeId);
-                }
-            }
-            else
-            {
-                if (!node.resourceTypeName.empty())
-                {
-                    const auto timeout = resourcePool_ ? resourcePool_->getAcquireTimeout(node.resourceTypeName)
-                                                       : std::chrono::milliseconds(0);
-                    ctx = resourcePool_->acquire(node.resourceTypeName,
-                                                 timeout,
-                                                 &packet->executionState_.hasFailed);
+                    Profiling::recordNodeScheduled(packet, tmpl->getTask(succIdx).nodeId);
                 }
 
-                Profiling::NodeScope execScope(packet, node.nodeId);
-
-                if (!packet->executionState_.hasFailed.load(std::memory_order_acquire))
-                {
-                    if (!node.nodeImpl)
-                    {
-                        execScope.markFailed();
-                        LOG.error("Node '%s' (index %zu) implementation is null", node.nodeId.c_str(), currentIndex);
-                        packet->markFailed();
-                    }
-                    else if (!node.resourceTypeName.empty() && !ctx)
-                    {
-                        execScope.markFailed();
-                        LOG.error("Failed to acquire resource '%s' for node '%s' (index %zu)",
-                                  node.resourceTypeName.c_str(), node.nodeId.c_str(), currentIndex);
-                        packet->markFailed();
-                    }
-                    else
-                    {
-                        try
-                        {
-                            if (ctx)
-                            {
-                                node.nodeImpl->execute(*packet, *ctx);
-                            }
-                            else
-                            {
-                                node.nodeImpl->execute(*packet, None::instance());
-                            }
-                        }
-                        catch (const std::exception &e)
-                        {
-                            execScope.markFailed();
-                            LOG.error("Node '%s' (index %zu) execution failed: %s",
-                                      node.nodeId.c_str(), currentIndex, e.what());
-                            packet->markFailed();
-                        }
-                    }
-                }
+                successorTasks.emplace_back([this, packet, succIdx, priority]()
+                                            { executeNode(packet, succIdx, priority); });
             }
+        }
 
-            // Always release the resource (if acquired), even if the packet has failed.
-            if (ctx)
-            {
-                resourcePool_->release(node.resourceTypeName, ctx);
-            }
+        if (!successorTasks.empty())
+        {
+            threadPool_->enqueueBatch(priority, std::move(successorTasks));
+        }
 
-            // Always advance the DAG so the output node can be reached.
-            packet->markNodeCompleted(currentIndex);
-
-            bool inlineAssigned = false;
-            for (size_t succIdx : node.childIndices)
-            {
-                packet->notifyPredecessorCompleted(succIdx);
-
-                if (packet->tryMarkNodeReady(succIdx))
-                {
-                    if (!inlineAssigned)
-                    {
-                        if constexpr (Profiling::kBuildProfiling)
-                        {
-                            Profiling::recordNodeScheduled(packet, tmpl->getTask(succIdx).nodeId);
-                        }
-                        readyQueue.push_back(succIdx);
-                        inlineAssigned = true;
-                    }
-                    else
-                    {
-                        scheduleNode(packet, succIdx);
-                    }
-                }
-            }
-
-            if (currentIndex == tmpl->getOutputNodeIndex())
-            {
-                onGraphCompleted(packet);
-            }
+        if (nodeIndex == tmpl->getOutputNodeIndex())
+        {
+            onGraphCompleted(packet);
         }
     }
 

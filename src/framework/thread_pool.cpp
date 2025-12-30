@@ -51,9 +51,10 @@ namespace GryFlux
                     if (stop_ && tasks_.empty()) {
                         return;
                     }
-                    
-                    task = std::move(tasks_.front());
+
+                    auto item = tasks_.top(); // copy TaskItem (OK for coarse-grained workload)
                     tasks_.pop();
+                    task = std::move(item.fn);
                 }
                 
                 // 执行任务
@@ -88,6 +89,34 @@ namespace GryFlux
             }
         }
         LOG.debug("[ThreadPool] Destroyed, all %zu threads joined", workers_.size());
+    }
+
+    void ThreadPool::enqueueBatch(Priority priority, std::vector<std::function<void()>> tasks)
+    {
+        if (tasks.empty())
+        {
+            return;
+        }
+
+        {
+            std::unique_lock<std::mutex> lock(queueMutex_);
+            if (stop_)
+            {
+                throw std::runtime_error("enqueue on stopped ThreadPool");
+            }
+
+            for (auto &fn : tasks)
+            {
+                TaskItem item;
+                item.priority = priority;
+                item.seq = nextSeq_.fetch_add(1, std::memory_order_relaxed);
+                item.fn = std::move(fn);
+                tasks_.push(std::move(item));
+            }
+        }
+
+        // 批量入队：一次唤醒多个 worker，减少长尾等待
+        condition_.notify_all();
     }
 
 } // namespace GryFlux

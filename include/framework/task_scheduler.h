@@ -55,17 +55,19 @@ namespace GryFlux
          *
          * @param packet 数据包
          * @param nodeIndex 节点索引
+         * @param priority 调度优先级（越小越优先，默认按 packet->getIdx()）
          */
-        void scheduleNode(DataPacket *packet, size_t nodeIndex);
+        void scheduleNode(DataPacket *packet, size_t nodeIndex, ThreadPool::Priority priority = 0);
 
     private:
         /**
-         * @brief 在当前线程执行节点及其内联后继
+         * @brief 执行单个节点
          *
          * @param packet 数据包
-         * @param nodeIndex 起始节点索引
+         * @param nodeIndex 节点索引
+         * @param priority 当前调度优先级
          */
-        void executeNodeChain(DataPacket *packet, size_t nodeIndex);
+        void executeNode(DataPacket *packet, size_t nodeIndex, ThreadPool::Priority priority);
 
         /**
          * @brief 图执行完成回调
