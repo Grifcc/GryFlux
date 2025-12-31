@@ -83,7 +83,7 @@ namespace GryFlux
             {
                 const auto timeout = resourcePool_ ? resourcePool_->getAcquireTimeout(node.resourceTypeName)
                                                    : std::chrono::milliseconds(0);
-                ctx = resourcePool_->acquire(node.resourceTypeName, timeout, &packet->executionState_.hasFailed);
+                ctx = resourcePool_->acquire(node.resourceTypeName, timeout, &packet->executionState_.hasFailed, priority);
             }
 
             Profiling::NodeScope execScope(packet, node.nodeId);

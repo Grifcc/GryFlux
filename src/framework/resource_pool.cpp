@@ -33,6 +33,13 @@ namespace GryFlux
         }
 
         auto &pool = resourceTypePools_[typeName];
+        if (!pool.waiters.empty())
+        {
+            LOG.warning("Re-registering resource type '%s' while %zu waiters pending; clearing waiters",
+                        typeName.c_str(), pool.waiters.size());
+            pool.waiters.clear();
+        }
+        pool.nextWaiterSeq = 0;
         pool.allContexts = std::move(instances);
         pool.acquireTimeout = acquireTimeout;
 
@@ -79,6 +86,19 @@ namespace GryFlux
                                                    std::chrono::milliseconds timeout,
                                                    const std::atomic<bool> *cancelFlag)
     {
+        return acquire(typeName, timeout, cancelFlag, 0);
+    }
+
+    std::shared_ptr<Context> ResourcePool::acquire(const std::string &typeName,
+                                                   std::chrono::milliseconds timeout,
+                                                   const std::atomic<bool> *cancelFlag,
+                                                   Priority priority)
+    {
+        if (cancelFlag && cancelFlag->load(std::memory_order_acquire))
+        {
+            return nullptr;
+        }
+
         std::unique_lock<std::mutex> registryLock(resourceRegistryMutex_);
 
         auto it = resourceTypePools_.find(typeName);
@@ -91,44 +111,55 @@ namespace GryFlux
         auto &pool = it->second;
         registryLock.unlock();
 
-        // 等待资源可用
         std::unique_lock<std::mutex> poolLock(pool.poolMutex);
 
-        auto availableOrCanceled = [&pool, cancelFlag]()
+        if (!pool.availableContexts.empty())
         {
-            if (!pool.availableContexts.empty())
+            auto context = pool.availableContexts.front();
+            pool.availableContexts.pop();
+            return context;
+        }
+
+        ResourceTypePool::Waiter waiter;
+        const uint64_t seq = pool.nextWaiterSeq++;
+        const auto key = ResourceTypePool::WaitKey{priority, seq};
+        auto waiterIt = pool.waiters.emplace(key, &waiter);
+
+        const auto deadline = (timeout == std::chrono::milliseconds::zero())
+                                  ? std::chrono::steady_clock::time_point::max()
+                                  : (std::chrono::steady_clock::now() + timeout);
+
+        while (!waiter.satisfied)
+        {
+            if (cancelFlag && cancelFlag->load(std::memory_order_acquire))
             {
-                return true;
+                pool.waiters.erase(waiterIt);
+                return nullptr;
             }
-            return cancelFlag && cancelFlag->load(std::memory_order_acquire);
-        };
 
-        // timeout == 0 => block indefinitely (resource pool acts as concurrency limiter)
-        if (timeout == std::chrono::milliseconds::zero())
-        {
-            pool.availabilityCondition.wait(poolLock, availableOrCanceled);
-        }
-        else if (!pool.availabilityCondition.wait_for(poolLock, timeout, availableOrCanceled))
-        {
-            // 超时
-            LOG.warning("Timeout acquiring resource '%s'", typeName.c_str());
-            return nullptr;
-        }
-
-        if (cancelFlag && cancelFlag->load(std::memory_order_acquire))
-        {
-            return nullptr;
-        }
-
-        if (pool.availableContexts.empty())
-        {
-            return nullptr;
+            if (deadline == std::chrono::steady_clock::time_point::max())
+            {
+                waiter.cv.wait(poolLock);
+            }
+            else
+            {
+                if (waiter.cv.wait_until(poolLock, deadline) == std::cv_status::timeout)
+                {
+                    if (!waiter.satisfied)
+                    {
+                        pool.waiters.erase(waiterIt);
+                        if (!(cancelFlag && cancelFlag->load(std::memory_order_acquire)))
+                        {
+                            LOG.warning("Timeout acquiring resource '%s'", typeName.c_str());
+                        }
+                        return nullptr;
+                    }
+                }
+            }
         }
 
-        auto context = pool.availableContexts.front();
-        pool.availableContexts.pop();
-
-        return context;
+        // waiter.satisfied == true => assigned is valid
+        return std::move(waiter.assigned);
     }
 
     void ResourcePool::release(const std::string &typeName, std::shared_ptr<Context> context)
@@ -152,11 +183,25 @@ namespace GryFlux
         registryLock.unlock();
 
         {
-            std::lock_guard<std::mutex> poolLock(pool.poolMutex);
-            pool.availableContexts.push(context);
-        }
+            std::unique_lock<std::mutex> poolLock(pool.poolMutex);
 
-        pool.availabilityCondition.notify_one();
+            // Prefer waking the highest-priority waiter (smallest priority).
+            if (!pool.waiters.empty())
+            {
+                auto first = pool.waiters.begin();
+                auto *waiter = first->second;
+                pool.waiters.erase(first);
+
+                waiter->assigned = std::move(context);
+                waiter->satisfied = true;
+
+                poolLock.unlock();
+                waiter->cv.notify_one();
+                return;
+            }
+
+            pool.availableContexts.push(std::move(context));
+        }
     }
 
     size_t ResourcePool::getAvailableCount(const std::string &typeName) const

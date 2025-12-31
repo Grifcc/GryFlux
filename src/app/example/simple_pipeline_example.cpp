@@ -158,7 +158,7 @@ int main(int argc, char **argv)
         graphTemplate,
         resourcePool,
         consumer,
-        12 // Thread pool size (maxActivePackets = 8 - 1 = 7 by default),
+        12 // Thread pool size (default maxActivePackets = threadPoolSize - 1 = 11),
     );
 
     if constexpr (GryFlux::Profiling::kBuildProfiling)

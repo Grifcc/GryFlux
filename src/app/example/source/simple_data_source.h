@@ -35,11 +35,11 @@ public:
             setHasMore(false);
             return nullptr;
         }
-
         auto packet = std::make_unique<SimpleDataPacket>();
         packet->id = static_cast<int>(producedCount_);
         // value 会在 InputNode 中初始化为 id
 
+        std::this_thread::sleep_for(std::chrono::microseconds(2500)); // 模拟数据准备延时
         producedCount_++;
         setHasMore(producedCount_ < totalPackets_);
         return packet;

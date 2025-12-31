@@ -21,6 +21,8 @@
 #include <vector>
 #include <memory>
 #include <atomic>
+#include <cstdint>
+#include <map>
 #include <queue>
 #include <mutex>
 #include <condition_variable>
@@ -41,6 +43,9 @@ namespace GryFlux
         : private NonCopyableNonMovable
     {
     public:
+        // 资源分配优先级（数值越小越优先）
+        using Priority = uint64_t;
+
         ResourcePool() = default;
         ~ResourcePool() = default;
 
@@ -92,6 +97,17 @@ namespace GryFlux
                                          const std::atomic<bool> *cancelFlag);
 
         /**
+         * @brief 获取资源（带优先级，阻塞直到可用或超时）
+         *
+         * 当资源不可用时，会进入该资源类型的等待队列；资源释放时按 priority（越小越优先）分配。
+         * 相同 priority 按到达顺序 FIFO。
+         */
+        std::shared_ptr<Context> acquire(const std::string &typeName,
+                                         std::chrono::milliseconds timeout,
+                                         const std::atomic<bool> *cancelFlag,
+                                         Priority priority);
+
+        /**
          * @brief 释放资源
          *
          * @param typeName 资源类型名称
@@ -110,11 +126,21 @@ namespace GryFlux
     private:
         struct ResourceTypePool
         {
+            struct Waiter
+            {
+                std::condition_variable cv;
+                std::shared_ptr<Context> assigned;
+                bool satisfied = false;
+            };
+
+            using WaitKey = std::pair<Priority, uint64_t>; // (priority, seq)
+
             std::queue<std::shared_ptr<Context>> availableContexts;
             std::vector<std::shared_ptr<Context>> allContexts;
             std::chrono::milliseconds acquireTimeout{std::chrono::milliseconds(0)};
             std::mutex poolMutex;
-            std::condition_variable availabilityCondition;
+            std::multimap<WaitKey, Waiter *> waiters;
+            uint64_t nextWaiterSeq = 0;
         };
 
         mutable std::mutex resourceRegistryMutex_;
