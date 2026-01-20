@@ -1,36 +1,32 @@
 /*************************************************************************************************************************
- * Copyright 2025 Sunhaihua1
+ * Copyright 2025 GKGgood
  *
  * GryFlux Framework - Simple Data Packet
  *************************************************************************************************************************/
 #pragma once
 
 #include "framework/data_packet.h"
+
 #include <vector>
+#include <cstdint>
 
 /**
- * @brief Simple Data Packet for parallel pipeline demonstration
+ * @brief Simple Data Packet for new_example DAG
  *
- * 演示并行节点的数据包结构，使用 vector 数据模拟真实场景。
+ * 该示例使用“预分配的固定长度 vector”来承载每个节点的输出，避免每帧/每节点反复分配内存，
+ * 同时便于用归约(sum)做正确性校验。
  *
- * DAG 结构：
- *
- *   Input
- *     ├─→ ImagePreprocess ─→ FeatExtractor ─┐
- *     └─→ ObjectDetection(NPU) ──────────────→ ObjectTracker
- *
- * 变换流程（可验证）：
- * - Input:           rawVec[i] = id (填充 256 个元素)
- * - ImagePreprocess: preprocessedVec[i] = rawVec[i] * 2        (并行分支1, CPU)
- * - ObjectDetection: detectionVec[i] = rawVec[i] + 10          (并行分支2, NPU)
- * - FeatExtractor:   featureVec[i] = preprocessedVec[i] + 5
- * - ObjectTracker:   trackVec[i] = detectionVec[i] + featureVec[i]
- * - Consumer:        验证 sum(trackVec) == 256 * (3 * id + 15)
- *
- * 关键设计：
- * - 并行节点（ImagePreprocess 和 ObjectDetection）写入不同字段
- * - 每个节点有独立的输出 vector，避免数据竞争
- * - ObjectDetection 在 NPU 上执行，模拟真实硬件加速
+ * 变换关系（可验证）：
+ * - input:    a = id
+ * - mul2:     b = a * 2
+ * - mul3:     c = a * 3
+ * - add3:     d = a + 3
+ * - mul4:     e = b * 2
+ * - mul6:     f = b * 3
+ * - sum_bcd:  g = b + c + d
+ * - sum_efg:  h = e + f + g
+ * - sum_hc:   i = h + c
+ * - output:   j = i
  */
 struct SimpleDataPacket : public GryFlux::DataPacket
 {
@@ -38,20 +34,30 @@ struct SimpleDataPacket : public GryFlux::DataPacket
 
     int id;  // 数据包编号
 
-    // 各节点的输出字段（避免并行节点冲突）
-    std::vector<float> rawVec;           // Input 节点设置
-    std::vector<float> preprocessedVec;  // ImagePreprocess 输出 (CPU)
-    std::vector<float> detectionVec;     // ObjectDetection 输出 (NPU, 并行!)
-    std::vector<float> featureVec;       // FeatExtractor 输出 (CPU)
-    std::vector<float> trackVec;         // ObjectTracker 输出 (融合结果)
+    // DAG 中间值/输出（vector，提前分配空间，避免运行时alloc带来的性能开销）
+    std::vector<float> aVec;
+    std::vector<float> bVec;
+    std::vector<float> cVec;
+    std::vector<float> dVec;
+    std::vector<float> eVec;
+    std::vector<float> fVec;
+    std::vector<float> gVec;
+    std::vector<float> hVec;
+    std::vector<float> iVec;
+    std::vector<float> jVec;
 
     SimpleDataPacket()
         : id(0),
-          rawVec(kVecSize),
-          preprocessedVec(kVecSize),
-          detectionVec(kVecSize),
-          featureVec(kVecSize),
-          trackVec(kVecSize)
+          aVec(kVecSize),
+          bVec(kVecSize),
+          cVec(kVecSize),
+          dVec(kVecSize),
+          eVec(kVecSize),
+          fVec(kVecSize),
+          gVec(kVecSize),
+          hVec(kVecSize),
+          iVec(kVecSize),
+          jVec(kVecSize)
     {
     }
 

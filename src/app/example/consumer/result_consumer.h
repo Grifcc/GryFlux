@@ -1,5 +1,5 @@
 /*************************************************************************************************************************
- * Copyright 2025 Sunhaihua1
+ * Copyright 2025 GKGgood
  *
  * GryFlux Framework - Result Consumer (Example)
  *************************************************************************************************************************/
@@ -9,20 +9,26 @@
 #include "packet/simple_data_packet.h"
 #include "utils/logger.h"
 #include <cmath>
+#include <numeric>
 
 /**
  * @brief 结果消费者 - 示例实现
  *
- * 验证并行管道的处理结果是否正确（使用归约验证）。
+ * 验证 new_example 这个 DAG 的输出是否正确。
  *
- * 期望的变换流程：
- * - Input:           rawVec[i] = id (256 个元素)
- * - ImagePreprocess: preprocessedVec[i] = rawVec[i] * 2        (并行分支1, CPU)
- * - ObjectDetection: detectionVec[i] = rawVec[i] + 10          (并行分支2, NPU)
- * - FeatExtractor:   featureVec[i] = preprocessedVec[i] + 5
- * - ObjectTracker:   trackVec[i] = detectionVec[i] + featureVec[i]
- * - Expected:        trackVec[i] = (id + 10) + (id * 2 + 5) = 3 * id + 15
- * - Reduction:       sum(trackVec) = 256 * (3 * id + 15)
+ * 变换关系：
+ * - input:    a = id
+ * - mul2:     b = a * 2
+ * - mul3:     c = a * 3
+ * - add3:     d = a + 3
+ * - mul4:     e = b * 2
+ * - mul6:     f = b * 3
+ * - sum_bcd:  g = b + c + d
+ * - sum_efg:  h = e + f + g
+ * - sum_hc:   i = h + c
+ * - output:   j = i
+ *
+ * 期望：j = 19 * id + 3
  */
 class ResultConsumer : public GryFlux::DataConsumer
 {
@@ -33,31 +39,25 @@ public:
     {
         auto &p = static_cast<SimpleDataPacket &>(*packet);
 
-        // 归约：计算 trackVec 的总和
-        float actualSum = 0.0f;
-        for (float val : p.trackVec)
-        {
-            actualSum += val;
-        }
+        const float x = static_cast<float>(p.id);
+        const float expectedOut = 19.0f * x + 3.0f;
 
-        // 计算期望值：每个元素应该是 (3 * id + 15)
-        // 总和 = 256 * (3 * id + 15)
-        float expectedSum = p.trackVec.size() * (3.0f * p.id + 15.0f);
+        const float sum = std::accumulate(p.jVec.begin(), p.jVec.end(), 0.0f);
+        const float expectedSum = static_cast<float>(SimpleDataPacket::kVecSize) * expectedOut;
 
-        // 验证结果（允许浮点误差）
-        float error = std::abs(actualSum - expectedSum);
-        bool correct = error < 0.01f;
+        float error = std::abs(sum - expectedSum);
+        bool correct = error < 0.001f;
 
         if (correct)
         {
-            LOG.info("Packet %d: ✓ PASS (sum = %.1f, expected = %.1f, error = %.6f)",
-                     p.id, actualSum, expectedSum, error);
+            LOG.info("Packet %d: ✓ PASS (output[0] = %.1f, sum = %.1f, expectedSum = %.1f, error = %.6f)",
+                     p.id, p.jVec.empty() ? 0.0f : p.jVec[0], sum, expectedSum, error);
             successCount_++;
         }
         else
         {
-            LOG.error("Packet %d: ✗ FAIL (sum = %.1f, expected = %.1f, error = %.6f)",
-                      p.id, actualSum, expectedSum, error);
+            LOG.error("Packet %d: ✗ FAIL (output[0] = %.1f, sum = %.1f, expectedSum = %.1f, error = %.6f)",
+                      p.id, p.jVec.empty() ? 0.0f : p.jVec[0], sum, expectedSum, error);
             failureCount_++;
         }
     }
