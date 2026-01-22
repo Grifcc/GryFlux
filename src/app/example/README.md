@@ -183,7 +183,7 @@ bash ./build.sh --enable_profile
 运行结束会输出 profiling 统计，并生成 `graph_timeline.json` 用于可视化。
 
 浏览器打开 http://profile.grifcc.top:8076/ 并选择相应 json 文件生成 timeline
-![Computation Graph](assets/newplot.png)
+![Computation Graph](assets/timeline_overview.png)
 该 timeline 对应的配置参数如下：
 ```cpp
 constexpr size_t kThreadPoolSize = 24;
