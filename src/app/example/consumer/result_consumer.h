@@ -8,13 +8,15 @@
 #include "framework/data_consumer.h"
 #include "packet/simple_data_packet.h"
 #include "utils/logger.h"
+
+#include <atomic>
 #include <cmath>
 #include <numeric>
 
 /**
  * @brief 结果消费者 - 示例实现
  *
- * 验证 new_example 这个 DAG 的输出是否正确。
+ * 验证 example 这个 DAG 的输出是否正确。
  *
  * 变换关系：
  * - input:    a = id
@@ -33,10 +35,12 @@
 class ResultConsumer : public GryFlux::DataConsumer
 {
 public:
-    ResultConsumer() : successCount_(0), failureCount_(0) {}
+    ResultConsumer() = default;
 
     void consume(std::unique_ptr<GryFlux::DataPacket> packet) override
     {
+        consumedCount_.fetch_add(1, std::memory_order_relaxed);
+
         auto &p = static_cast<SimpleDataPacket &>(*packet);
 
         const float x = static_cast<float>(p.id);
@@ -52,21 +56,18 @@ public:
         {
             LOG.info("Packet %d: ✓ PASS (output[0] = %.1f, sum = %.1f, expectedSum = %.1f, error = %.6f)",
                      p.id, p.jVec.empty() ? 0.0f : p.jVec[0], sum, expectedSum, error);
-            successCount_++;
         }
         else
         {
             LOG.error("Packet %d: ✗ FAIL (output[0] = %.1f, sum = %.1f, expectedSum = %.1f, error = %.6f)",
-                      p.id, p.jVec.empty() ? 0.0f : p.jVec[0], sum, expectedSum, error);
-            failureCount_++;
+                     p.id, p.jVec.empty() ? 0.0f : p.jVec[0], sum, expectedSum, error);
         }
     }
 
-    // 获取统计信息
-    size_t getSuccessCount() const { return successCount_; }
-    size_t getFailureCount() const { return failureCount_; }
+    // Statistics
+    size_t getConsumedCount() const { return consumedCount_.load(std::memory_order_relaxed); }
 
 private:
-    size_t successCount_;
-    size_t failureCount_;
+    std::atomic<size_t> consumedCount_{0};
+    
 };

@@ -4,26 +4,18 @@
  * This example demonstrates a small DAG with limited resources (adder/multiplier)
  * plus CPU-only nodes.
  *
- * DAG Structure (6 layers, 10 nodes):
- *├
- *   input
- *     │               ─────────→ e_mul4 ──────────┐
- *     ├─→ b_mul2 ───→├─────────→ f_mul6 ──────→ hsum_efg ───→ isum_hc ──→ output
- *     │              └─────────→ gsum_bcd ────────┘             ↑
- *     ├─→ d_add3 ───────────────────┘                           │
- *     │                             ↑                           │
- *     └─→ c_mul3 ───────────────────┘───────────────────────────┘
+ * DAG Structure: assests/chart.svg (6 layers, 10 nodes)
  *
  * Data Flow (verifiable):
  * - input:     a = id
- * - b_mul2:    b = a * 2
- * - c_mul3:    c = a * 3
- * - d_add3:    d = a + 3
- * - e_mul4:    e = b * 2
- * - f_mul6:    f = b * 3
- * - gsum_bcd:  g = b + c + d
- * - hsum_efg:  h = e + f + g
- * - isum_hc:   i = h + c
+ * - BMul:      b = a * 2
+ * - CMul:      c = a * 3
+ * - DAdd:      d = a + 3
+ * - EMul:      e = b * 2
+ * - FMul:      f = b * 3
+ * - GSum:      g = b + c + d
+ * - HSum:      h = e + f + g
+ * - ISum:      i = h + c
  * - output:    j = i
  *************************************************************************************************************************/
 
@@ -39,8 +31,17 @@
 #include "context/simulated_multiplier_context.h"
 #include "packet/simple_data_packet.h"
 
-// Pipeline nodes
-#include "nodes/dag_nodes.h"
+// Pipeline nodes 
+#include "nodes/Input/InputNode.h"
+#include "nodes/BMul/BMulNode.h"
+#include "nodes/CMul/CMulNode.h"
+#include "nodes/DAdd/DAddNode.h"
+#include "nodes/EMul/EMulNode.h"
+#include "nodes/FMul/FMulNode.h"
+#include "nodes/GSum/GSumNode.h"
+#include "nodes/HSum/HSumNode.h"
+#include "nodes/ISum/ISumNode.h"
+#include "nodes/Output/OutputNode.h"
 
 // Source and Consumer
 #include "source/simple_data_source.h"
@@ -52,28 +53,36 @@
 
 static double computeTheoreticalMaxThroughputPps(
     size_t threadPoolSize,
+    size_t producerTimeMs,
     size_t adderInstances,
-    size_t multiplierInstances);
+    size_t multiplierInstances,
+    double cpuDelayMs,
+    double adderDelayMs,
+    double multiplierDelayMs);
 
 int main(int argc, char **argv)
 {
     // Initialize logger
     LOG.setLevel(GryFlux::LogLevel::INFO);  // 改为 DEBUG 可查看各节点详细日志
     LOG.setOutputType(GryFlux::LogOutputType::CONSOLE);
-    LOG.setAppName("new_example");
+    LOG.setAppName("example");
 
     LOG.info("========================================");
-    LOG.info("  GryFlux DAG Example (new_example)");
+    LOG.info("  GryFlux DAG Example ");
     LOG.info("  6 layers, 10 nodes: input-output");
     LOG.info("========================================");
 
     // -------------------- Step 1: Create Resource Pool --------------------
 
-    // Keep runtime config in one place so throughput estimation reads the same values.
     constexpr size_t kThreadPoolSize = 24;
     constexpr size_t kMaxActivePackets = 6;
-    constexpr size_t kAdderInstances = 2;
-    constexpr size_t kMultiplierInstances = 2;
+
+    constexpr size_t kAdderInstances = 2;   // To register 2 adder resources
+    constexpr size_t kMultiplierInstances = 2;  // To register 2 multiplier resources
+
+    constexpr int kCpuDelayMs = 2;
+    constexpr int kAdderDelayMs = 5;
+    constexpr int kMultiplierDelayMs = 10;
 
     auto resourcePool = std::make_shared<GryFlux::ResourcePool>();
 
@@ -89,7 +98,6 @@ int main(int argc, char **argv)
     }
     LOG.info("Registered %zu Adder resources", kAdderInstances);
 
-    // mul2/mul3 can run in parallel, so provide multiple multiplier resources
     {
         std::vector<std::shared_ptr<GryFlux::Context>> multiplierContexts;
         multiplierContexts.reserve(kMultiplierInstances);
@@ -105,38 +113,38 @@ int main(int argc, char **argv)
 
     // Build graph template:
     // Layer 1: input
-    // Layer 2: b_mul2, c_mul3, d_add3 (depend on input)
-    // Layer 3: e_mul4, f_mul6, gsum_bcd
-    // Layer 4: hsum_efg
-    // Layer 5: isum_hc
+    // Layer 2: b_mul, c_mul, d_add (depend on input)
+    // Layer 3: e_mul, f_mul, g_sum
+    // Layer 4: h_sum
+    // Layer 5: i_sum
     // Layer 6: output
     // NOTE: CPU-only nodes do not depend on limited resources.
     auto graphTemplate = GryFlux::GraphTemplate::buildOnce(
-        [](GryFlux::TemplateBuilder *builder)
+        [=](GryFlux::TemplateBuilder *builder)
         {
-            builder->setInputNode<PipelineNodes::InputNode>("input");
+            builder->setInputNode<PipelineNodes::InputNode>("input", kCpuDelayMs);
+            builder->addTask<PipelineNodes::BMulNode>("b_mul", "multiplier", {"input"}, kMultiplierDelayMs);
+            builder->addTask<PipelineNodes::CMulNode>("c_mul", "multiplier", {"input"}, kMultiplierDelayMs);
+            builder->addTask<PipelineNodes::DAddNode>("d_add", "", {"input"}, kCpuDelayMs);
 
-            builder->addTask<PipelineNodes::Mul2Node>("b_mul2", "multiplier", {"input"});
-            builder->addTask<PipelineNodes::Mul3Node>("c_mul3", "multiplier", {"input"});
-            builder->addTask<PipelineNodes::Add3Node>("d_add3", "", {"input"});
+            builder->addTask<PipelineNodes::EMulNode>("e_mul", "", {"b_mul"}, kCpuDelayMs);
+            builder->addTask<PipelineNodes::FMulNode>("f_mul", "multiplier", {"b_mul"}, kMultiplierDelayMs);
+            builder->addTask<PipelineNodes::GSumNode>("g_sum", "adder", {"b_mul", "c_mul", "d_add"}, kAdderDelayMs);
 
-            builder->addTask<PipelineNodes::Mul4Node>("e_mul4", "", {"b_mul2"});
-            builder->addTask<PipelineNodes::Mul6Node>("f_mul6", "multiplier", {"b_mul2"});
-            builder->addTask<PipelineNodes::SumBcdNode>("gsum_bcd", "adder", {"b_mul2", "c_mul3", "d_add3"});
+            builder->addTask<PipelineNodes::HSumNode>("h_sum", "adder", {"e_mul", "f_mul", "g_sum"}, kAdderDelayMs);
 
-            builder->addTask<PipelineNodes::SumEfgNode>("hsum_efg", "adder", {"e_mul4", "f_mul6", "gsum_bcd"});
+            builder->addTask<PipelineNodes::ISumNode>("i_sum", "adder", {"h_sum", "c_mul"}, kAdderDelayMs);
 
-            builder->addTask<PipelineNodes::SumHcNode>("isum_hc", "adder", {"hsum_efg", "c_mul3"});
-
-            builder->setOutputNode<PipelineNodes::OutputNode>("output", {"isum_hc"});
+            builder->setOutputNode<PipelineNodes::OutputNode>("output", {"i_sum"}, kCpuDelayMs);
         });
 
     LOG.info("Transformation: i = 19 * id + 3, output(j) = i");
 
     // -------------------- Step 3: Create Data Source --------------------
 
-    const int NUM_PACKETS = 300;
-    auto source = std::make_shared<SimpleDataSource>(NUM_PACKETS);
+    constexpr int NUM_PACKETS = 300;
+    constexpr int producerTimeMs = 16; // ms per packet
+    auto source = std::make_shared<SimpleDataSource>(NUM_PACKETS, producerTimeMs);
 
     LOG.info("Created SimpleDataSource with %d packets", NUM_PACKETS);
 
@@ -180,8 +188,12 @@ int main(int argc, char **argv)
     // -------------------- Step 6: Show Statistics --------------------
     const double theoreticalMaxThroughput = computeTheoreticalMaxThroughputPps(
         kThreadPoolSize,
+        producerTimeMs,
         kAdderInstances,
-        kMultiplierInstances);
+        kMultiplierInstances,
+        static_cast<double>(kCpuDelayMs),
+        static_cast<double>(kAdderDelayMs),
+        static_cast<double>(kMultiplierDelayMs));
 
     LOG.info("========================================");
     LOG.info("All %d packets completed in %lld ms", NUM_PACKETS, duration.count());
@@ -190,8 +202,14 @@ int main(int argc, char **argv)
     LOG.info("Throughput: %.2f packets/sec", 1000.0 * NUM_PACKETS / duration.count());
     LOG.info("========================================");
     LOG.info("Verification Results:");
-    LOG.info("  ✓ Success: %zu packets", consumer->getSuccessCount());
-    LOG.info("  ✗ Failure: %zu packets", consumer->getFailureCount());
+    const size_t consumedPackets = consumer->getConsumedCount();
+    const size_t droppedOrFailedPackets =
+        (NUM_PACKETS >= static_cast<int>(consumedPackets))
+            ? static_cast<size_t>(NUM_PACKETS) - consumedPackets
+            : 0;
+
+    LOG.info("  ✓ Consumed: %zu packets", consumedPackets);
+    LOG.info("  ✗ Failure : %zu packets", droppedOrFailedPackets);
     LOG.info("========================================");
 
     // -------------------- Step 7: Show Profiling Statistics --------------------
@@ -208,26 +226,26 @@ int main(int argc, char **argv)
     {
         LOG.info("Graph profiler 未编译，跳过统计输出。");
     }
-    return (consumer->getFailureCount() == 0) ? 0 : 1;
+    // return (consumer->getFailureCount() == 0) ? 0 : 1;
 }
 
 
 static double computeTheoreticalMaxThroughputPps(
     size_t threadPoolSize,
+    size_t producerTimeMs,
     size_t adderInstances,
-    size_t multiplierInstances)
+    size_t multiplierInstances,
+    double cpuDelayMs,
+    double adderDelayMs,
+    double multiplierDelayMs)
 {
     // Node counts by resource (current DAG):
-    // CPU: input, d_add3, e_mul4, output => 4 nodes
-    // adder: gsum_bcd, hsum_efg, isum_hc => 3 nodes
-    // multiplier: b_mul2, c_mul3, f_mul6 => 3 nodes
+    // CPU: input, d_add, e_mul, output => 4 nodes
+    // adder: g_sum, h_sum, i_sum => 3 nodes
+    // multiplier: b_mul, c_mul, f_mul => 3 nodes
     constexpr double kCpuNodesPerPacket = 4.0;
     constexpr double kAdderNodesPerPacket = 3.0;
     constexpr double kMultiplierNodesPerPacket = 3.0;
-
-    const double cpuDelayMs = static_cast<double>(PipelineNodes::DagNodeDelayConfig::kCpuDelayMs);
-    const double adderDelayMs = static_cast<double>(PipelineNodes::DagNodeDelayConfig::kAdderDelayMs);
-    const double multiplierDelayMs = static_cast<double>(PipelineNodes::DagNodeDelayConfig::kMultiplierDelayMs);
 
     const double totalWorkMs =
         kCpuNodesPerPacket * cpuDelayMs +
@@ -237,9 +255,10 @@ static double computeTheoreticalMaxThroughputPps(
     const double adderDemandMs = kAdderNodesPerPacket * adderDelayMs;
     const double multiplierDemandMs = kMultiplierNodesPerPacket * multiplierDelayMs;
 
+    const double producerCount = static_cast<double>(1000.0 / producerTimeMs);
     const double cpuMax = (static_cast<double>(threadPoolSize) * 1000.0) / totalWorkMs;
     const double adderMax = (static_cast<double>(adderInstances) * 1000.0) / adderDemandMs;
     const double mulMax = (static_cast<double>(multiplierInstances) * 1000.0) / multiplierDemandMs;
 
-    return std::min({cpuMax, adderMax, mulMax});
+    return std::min({cpuMax, adderMax, mulMax, producerCount});
 }

@@ -11,21 +11,21 @@
 #include <cstdint>
 
 /**
- * @brief Simple Data Packet for new_example DAG
+ * @brief Simple Data Packet for example DAG
  *
  * 该示例使用“预分配的固定长度 vector”来承载每个节点的输出，避免每帧/每节点反复分配内存，
  * 同时便于用归约(sum)做正确性校验。
  *
  * 变换关系（可验证）：
  * - input:    a = id
- * - mul2:     b = a * 2
- * - mul3:     c = a * 3
- * - add3:     d = a + 3
- * - mul4:     e = b * 2
- * - mul6:     f = b * 3
- * - sum_bcd:  g = b + c + d
- * - sum_efg:  h = e + f + g
- * - sum_hc:   i = h + c
+ * - b_mul:    b = a * 2
+ * - c_mul:    c = a * 3
+ * - d_add:    d = a + 3
+ * - e_mul:    e = b * 2
+ * - f_mul:    f = b * 3
+ * - g_sum:    g = b + c + d
+ * - h_sum:    h = e + f + g
+ * - i_sum:    i = h + c
  * - output:   j = i
  */
 struct SimpleDataPacket : public GryFlux::DataPacket

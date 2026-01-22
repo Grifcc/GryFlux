@@ -25,8 +25,8 @@ public:
      *
      * @param totalPackets 要产生的数据包总数
      */
-    explicit SimpleDataSource(size_t totalPackets)
-        : totalPackets_(totalPackets), producedCount_(0)
+    explicit SimpleDataSource(size_t totalPackets, size_t producerTime)
+        : totalPackets_(totalPackets), producedCount_(0), producerTime_(producerTime)
     {
         setHasMore(totalPackets_ > 0);
     }
@@ -42,7 +42,7 @@ public:
         packet->id = static_cast<int>(producedCount_);
         // value 会在 InputNode 中初始化为 id
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(16)); // 模拟数据准备延时
+        std::this_thread::sleep_for(std::chrono::milliseconds(producerTime_)); // 模拟数据准备延时
         producedCount_++;
         setHasMore(producedCount_ < totalPackets_);
         return packet;
@@ -51,4 +51,5 @@ public:
 private:
     size_t totalPackets_;
     size_t producedCount_;
+    size_t producerTime_;
 };
