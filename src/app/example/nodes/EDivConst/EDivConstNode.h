@@ -5,10 +5,10 @@
 namespace PipelineNodes
 {
 
-class DAddNode : public GryFlux::NodeBase
+class EDivConstNode : public GryFlux::NodeBase
 {
 public:
-    explicit DAddNode(int delayMs) : delayMs_(delayMs) {}
+    explicit EDivConstNode(int delayMs) : delayMs_(delayMs) {}
 
     void execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx) override;
 

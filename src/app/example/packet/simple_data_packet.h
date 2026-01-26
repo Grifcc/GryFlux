@@ -19,9 +19,9 @@
  * 变换关系（可验证）：
  * - input:    a = id
  * - b_mul:    b = a * 2
- * - c_mul:    c = a * 3
+ * - c_sub:    c = a - 1
  * - d_add:    d = a + 3
- * - e_mul:    e = b * 2
+ * - e_div:    e = b / 2
  * - f_mul:    f = b * 3
  * - g_sum:    g = b + c + d
  * - h_sum:    h = e + f + g

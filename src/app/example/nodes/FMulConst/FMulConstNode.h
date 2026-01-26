@@ -5,15 +5,13 @@
 namespace PipelineNodes
 {
 
-class CMulNode : public GryFlux::NodeBase
+class FMulConstNode : public GryFlux::NodeBase
 {
 public:
-    explicit CMulNode(int delayMs) : delayMs_(delayMs) {}
+    FMulConstNode() = default;
 
     void execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx) override;
 
-private:
-    int delayMs_;
 };
 
 } // namespace PipelineNodes

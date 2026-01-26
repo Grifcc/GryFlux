@@ -19,18 +19,18 @@
  * 验证 example 这个 DAG 的输出是否正确。
  *
  * 变换关系：
- * - input:    a = id
- * - mul2:     b = a * 2
- * - mul3:     c = a * 3
- * - add3:     d = a + 3
- * - mul4:     e = b * 2
- * - mul6:     f = b * 3
- * - sum_bcd:  g = b + c + d
- * - sum_efg:  h = e + f + g
- * - sum_hc:   i = h + c
- * - output:   j = i
+ * - input:     a = id
+ * - BMul:      b = a * 2
+ * - CSub:      c = a - 1
+ * - DMul:      d = a * 4
+ * - EDiv:      e = b / 2
+ * - FMul:      f = b * 3
+ * - GSum:      g = b + c + d
+ * - HSum:      h = e + f + g
+ * - ISum:      i = h + c
+ * - output:    j = i
  *
- * 期望：j = 19 * id + 3
+ * expect output: j = 18 * id - 1
  */
 class ResultConsumer : public GryFlux::DataConsumer
 {
@@ -44,7 +44,7 @@ public:
         auto &p = static_cast<SimpleDataPacket &>(*packet);
 
         const float x = static_cast<float>(p.id);
-        const float expectedOut = 19.0f * x + 3.0f;
+        const float expectedOut = 18.0f * x - 1.0f;
 
         const float sum = std::accumulate(p.jVec.begin(), p.jVec.end(), 0.0f);
         const float expectedSum = static_cast<float>(SimpleDataPacket::kVecSize) * expectedOut;

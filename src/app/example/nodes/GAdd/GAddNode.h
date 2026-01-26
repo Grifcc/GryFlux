@@ -5,15 +5,13 @@
 namespace PipelineNodes
 {
 
-class HSumNode : public GryFlux::NodeBase
+class GAddNode : public GryFlux::NodeBase
 {
 public:
-    explicit HSumNode(int delayMs) : delayMs_(delayMs) {}
+    GAddNode() = default;
 
     void execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx) override;
 
-private:
-    int delayMs_;
 };
 
 } // namespace PipelineNodes

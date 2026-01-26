@@ -32,7 +32,8 @@ struct MyPacket : public GryFlux::DataPacket {
 
 节点只需要继承 `GryFlux::NodeBase` 并实现 `execute()`。
 
-本 example 里，每个节点都会通过构造参数接收一个 `delayMs`，用于 `sleep_for` 模拟耗时（配置在构图处传入）。
+本示例中，CPU 节点通过构造参数接收 `delayMs`，用于 `sleep_for` 模拟耗时；
+受限资源节点（adder/multiplier）把延时放在 `Context` 内部。
 
 ```cpp
 class InputNode : public GryFlux::NodeBase {
@@ -55,26 +56,33 @@ private:
 
 当某个节点需要“受限硬件资源”（例如本示例里的 adder/multiplier）时，你需要定义一个 `GryFlux::Context` 子类，用于封装该资源的操作接口。
 
-
 ```cpp
-class SimulatedAdderContext : public GryFlux::Context
+class MultiplierContext : public GryFlux::Context
 {
 public:
-    explicit SimulatedAdderContext(int deviceId) : deviceId_(deviceId) {}
+    explicit MultiplierContext(int deviceId, int delayMs = 0)
+        : deviceId_(deviceId), delayMs_(delayMs) {}
 
     int getDeviceId() const { return deviceId_; }
 
-    float add(float a, float b)
+    std::vector<float> mul(const std::vector<float> &a, const std::vector<float> &b)
     {
-        opCount_.fetch_add(1, std::memory_order_relaxed);
-        return a + b;
+        const size_t size = std::min(a.size(), b.size());
+        std::vector<float> out(size);
+        for (size_t i = 0; i < size; ++i)
+        {
+            out[i] = a[i] * b[i];
+        }
+        if (delayMs_ > 0)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(delayMs_));
+        }
+        return out;
     }
-
-    uint64_t getOpCount() const { return opCount_.load(std::memory_order_relaxed); }
 
 private:
     int deviceId_ = 0;
-    std::atomic<uint64_t> opCount_{0};
+    int delayMs_ = 0;
 };
 ```
 
@@ -83,15 +91,21 @@ private:
 当节点需要受限硬件资源时，先注册对应资源类型：
 
 ```cpp
-auto pool = std::make_shared<GryFlux::ResourcePool>();
-pool->registerResourceType("adder", {
-	std::make_shared<SimulatedAdderContext>(0),
-	std::make_shared<SimulatedAdderContext>(1),
-});
-pool->registerResourceType("multiplier", {
-	std::make_shared<SimulatedMultiplierContext>(0),
-	std::make_shared<SimulatedMultiplierContext>(1),
-});
+constexpr size_t kAdderInstances = 2;   // To register 2 adder resources
+constexpr int kAdderDelayMs = 5;
+
+auto resourcePool = std::make_shared<GryFlux::ResourcePool>();
+{
+    std::vector<std::shared_ptr<GryFlux::Context>> adderContexts;
+    adderContexts.reserve(kAdderInstances);
+    for (size_t i = 0; i < kAdderInstances; ++i)
+    {
+        adderContexts.push_back(std::make_shared<AdderContext>(
+            static_cast<int>(i),
+            kAdderDelayMs));
+    }
+    resourcePool->registerResourceType("adder", std::move(adderContexts));
+}
 ```
 
 ### 5) 构建 DAG（GraphTemplate + TemplateBuilder）
@@ -104,18 +118,17 @@ pool->registerResourceType("multiplier", {
 
 ```cpp
 constexpr int kCpuDelayMs = 2;
-constexpr int kAdderDelayMs = 5;
-constexpr int kMultiplierDelayMs = 10;
 
 auto graphTemplate = GryFlux::GraphTemplate::buildOnce(
 	[=](GryFlux::TemplateBuilder *builder) {
 		builder->setInputNode<PipelineNodes::InputNode>("input", kCpuDelayMs);
 
 		// resourceTypeName: "multiplier" / "adder" / "" (CPU)
-		builder->addTask<PipelineNodes::BMulNode>("b_mul", "multiplier", {"input"}, kMultiplierDelayMs);
-		builder->addTask<PipelineNodes::GSumNode>("g_sum", "adder", {"b_mul" /* ... */}, kAdderDelayMs);
+		builder->addTask<PipelineNodes::BMulNode>("b_mul", "multiplier", {"input"});
+		builder->addTask<PipelineNodes::CSubNode>("c_sub", "", {"input"}, kCpuDelayMs);
+		builder->addTask<PipelineNodes::GAddNode>("g_add", "adder", {"b_mul" /* ... */});
 
-		builder->setOutputNode<PipelineNodes::OutputNode>("output", {"g_sum"}, kCpuDelayMs);
+		builder->setOutputNode<PipelineNodes::OutputNode>("output", {"g_add"}, kCpuDelayMs);
 	}
 );
 ```
@@ -146,19 +159,24 @@ DAG结构图：
 
 当前资源绑定：
 
-- `multiplier`：BMul、CMul、FMul
-- `adder`：GSum、HSum、ISum
-- `CPU`(无资源)：Input、DAdd、EMul、Output
+- `multiplier(蓝)`：BMul、DMul、FMul
+- `adder(黄)`：GAdd、HAdd、IAdd
+- `CPU(绿)`无资源：Input、CSub、EDiv、Output
 
-## 模拟耗时（可用于制造瓶颈）
+## 模拟耗时
 
-延时通过 `addTask()/setInputNode()/setOutputNode()` 直接传给各节点构造函数，并在节点实现里通过 `sleep_for` 模拟耗时：
+延时分两类：
+
+1) **CPU 节点**：通过 `addTask()/setInputNode()/setOutputNode()` 传入 `delayMs`，在节点实现里 `sleep_for`。
+2) **受限资源 Context（adder/multiplier）**：延时在 `Context` 内部统一处理。
+
+相关参数：
 
 - `kCpuDelayMs`
 - `kAdderDelayMs`
 - `kMultiplierDelayMs`
 
-你可以通过增大不同的资源耗时以制造不同的资源瓶颈。
+可以通过调整不同资源的延时来制造瓶颈。
 
 ## Profiling 编译与运行
 
@@ -187,20 +205,22 @@ bash ./build.sh --enable_profile
 该 timeline 对应的配置参数如下：
 ```cpp
 constexpr size_t kThreadPoolSize = 24;
-constexpr size_t kMaxActivePackets = 6;
+constexpr size_t kMaxActivePackets = 4;
+// kMaxActivePackets is considered to be greater than Theoretical Max Throughput * average packet consume time 
 constexpr size_t kAdderInstances = 2;   // To register 2 adder resources
 constexpr size_t kMultiplierInstances = 2;  // To register 2 multiplier resources
 constexpr int kCpuDelayMs = 2;
 constexpr int kAdderDelayMs = 5;
 constexpr int kMultiplierDelayMs = 10;
-constexpr int producerTimeMs = 16
+constexpr int producerTimeMs = 15	// ms/packet
+// producerTimeMs should be greater than (1 / Theoretical Max Throughput) to keep the system stable
 ```
 可以看到：
 - 单个 packet 内部节点的运算顺序严格依照计算图进行
-- 由于资源限制，同时最多只有两个乘法节点在运行
-- 框架面对源源不断的 packet 输入时有着非常清晰的流式处理
+- 由于资源限制，同时最多只有两个乘法节点在运行；同时最多只有四个包在运行
+- 系统稳定，框架面对源源不断的 packet 输入时有着非常清晰的流式处理
 
-## 吞吐量分析：
+## 吞吐量分析
 
 示例会在运行结束打印两行：
 
@@ -214,22 +234,47 @@ constexpr int producerTimeMs = 16
     - `kMultiplierDelayMs = 10ms`，`kMultiplierInstances = 2`，那么 multiplier 的吞吐上限大致是：
 	**2 / 30ms ≈ 66.7 packet/s**
 
-
-
 最终的“理论最大吞吐”通常由最紧的那个上限决定。
 
-注意：即使资源/线程池有余量，下面这些也会把实际吞吐压下来：
+`kMaxActivePackets` 对吞吐的影响：
+
+- **Little's Law: $L = λ * W$**
+
+含义（稳定系统）：
+
+- $L$：系统平均在途包数（可近似理解为 `activePackets`）
+- $\lambda$：平均吞吐（packets/s）
+- $W$：端到端平均时延（s）
+
+因此，如果希望 `Throughput` 能尽可能接近 `Theoretical Max Throughput`，通常需要：
+
+- `kMaxActivePackets` 至少覆盖 $\lambda \cdot W$
+
+估算方法：
+
+1) $\lambda$ 可取理论最大吞吐（$\lambda \approx 1 / producerTimeMs \approx 66.7 packets/s$）
+2) $W$ 可用 profiling 统计平均耗时，可以由关键路径 + 生产者 + 消费者的总耗时估算
+
+（本例的关键路径是Input → BMul → FMul → HAdd → IAdd → Output,约为 **35ms**，再加生产者与消费者的总耗时 **15ms**，共 **50ms**）
+
+3) $L ≥ 66.7 packets/s * 0.05 s \approx  3.33 packet$
+
+- 因此 `kMaxActivePackets` 取值大于等于 **4** 比较合理，不会约束实际吞吐。
+
+注意：即使资源/线程池有余量，下面这些也影响实际吞吐：
 
 - 数据源 `produce()` 的 sleep/IO（本示例里有模拟 sleep）
 - consumer 的重日志打印（大量 `INFO` 会显著影响吞吐）
+- 节点或资源报错导致了个别节点或数据包无需被消费
 - 操作系统调度、CPU 频率、核数、NUMA 等环境因素
 
 
-## 故障注入：在节点 GSum 中随机抛异常
+## 故障注入
 
 为观察框架如何处理节点执行失败：
 
-- 在节点 `GSum` 内部生成一个整数 0-9 范围内的均匀分布，当生成的随机数为 0 或 1 时会触发错误
+- 在节点 `GSum` 内部生成一个整数 0-49 范围内的均匀分布，当生成的随机数为 1 时会触发错误
+- 在节点 `CSub` 内部生成一个整数 0-99 范围内的均匀分布，当生成的随机数为 1 时会触发错误
 - 抛异常的 packet 会被框架判定为失败并丢弃（consumer 不会收到它）
 
 因此，本示例中的 failure 统计采用更贴近“流式处理”的口径：
@@ -240,27 +285,26 @@ constexpr int producerTimeMs = 16
 
 **[INFO] 正常运行**
 ```
-[INFO ] Packet 6: ✓ PASS (output[0] = 117.0, sum = 29952.0, expectedSum = 29952.0, error = 0.000000)
-[INFO ] Packet 7: ✓ PASS (output[0] = 136.0, sum = 34816.0, expectedSum = 34816.0, error = 0.000000)
-[INFO ] Packet 8: ✓ PASS (output[0] = 155.0, sum = 39680.0, expectedSum = 39680.0, error = 0.000000)
-[INFO ] Packet 9: ✓ PASS (output[0] = 174.0, sum = 44544.0, expectedSum = 44544.0, error = 0.000000)
+[INFO ] Packet 7: ✓ PASS (output[0] = 125.0, sum = 32000.0, expectedSum = 32000.0, error = 0.000000)
+[INFO ] Packet 8: ✓ PASS (output[0] = 143.0, sum = 36608.0, expectedSum = 36608.0, error = 0.000000)
+[INFO ] Packet 9: ✓ PASS (output[0] = 161.0, sum = 41216.0, expectedSum = 41216.0, error = 0.000000)
 ```
 
 **[ERROR]/[WARN] Packet 或 Node 报错**
 ```
-[ERROR] Packet 15: Injected error in node 'g_sum'
-[ERROR] Node 'g_sum' (index 6) execution failed: Simulated error in GSumNode
+[ERROR] Packet 15: Injected error in node 'g_add'
+[ERROR] Node 'g_add' (index 6) execution failed: Simulated error in GAddNode
 [WARN ] Dropping failed packet id=15
 ```
 
 **吞吐量和Failure统计**
 ```
-[INFO ] All 300 packets completed in 4883 ms
-[INFO ] Average: 16.28 ms/packet
-[INFO ] Theoretical Max Throughput: 62.50 packets/sec
-[INFO ] Throughput: 61.44 packets/sec
+[INFO ] All 300 packets completed in 4630 ms
+[INFO ] Average: 15.43 ms/packet
+[INFO ] Theoretical Max Throughput: 66.67 packets/sec
+[INFO ] Throughput: 64.79 packets/sec
 [INFO ] ========================================
 [INFO ] Verification Results:
-[INFO ]   ✓ Consumed: 242 packets
-[INFO ]   ✗ Failure : 58 packets
+[INFO ]   ✓ Consumed: 289 packets
+[INFO ]   ✗ Failure : 11 packets
 ```

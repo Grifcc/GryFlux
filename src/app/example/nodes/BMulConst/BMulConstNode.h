@@ -6,15 +6,13 @@
 namespace PipelineNodes
 {
 
-class BMulNode : public GryFlux::NodeBase
+class BMulConstNode : public GryFlux::NodeBase
 {
 public:
-	explicit BMulNode(int delayMs) : delayMs_(delayMs) {}
+	BMulConstNode() = default;
 
 	void execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx) override;
 
-private:
-	int delayMs_;
 };
 
 } // namespace PipelineNodes

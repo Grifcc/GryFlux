@@ -9,13 +9,13 @@
  * Data Flow (verifiable):
  * - input:     a = id
  * - BMul:      b = a * 2
- * - CMul:      c = a * 3
- * - DAdd:      d = a + 3
- * - EMul:      e = b * 2
+ * - CSub:      c = a - 1
+ * - DMul:      d = a * 4
+ * - EDiv:      e = b / 2
  * - FMul:      f = b * 3
- * - GSum:      g = b + c + d
- * - HSum:      h = e + f + g
- * - ISum:      i = h + c
+ * - GAdd:      g = b + c + d
+ * - HAdd:      h = e + f + g
+ * - IAdd:      i = h + c
  * - output:    j = i
  *************************************************************************************************************************/
 
@@ -27,8 +27,8 @@
 #include "utils/logger.h"
 
 // Custom types
-#include "context/simulated_adder_context.h"
-#include "context/simulated_multiplier_context.h"
+#include "context/AdderContext.h"
+#include "context/MultiplierContext.h"
 #include "packet/simple_data_packet.h"
 
 // Pipeline nodes 
@@ -66,7 +66,8 @@ int main(int argc, char **argv)
     // -------------------- Step 1: Create Resource Pool --------------------
 
     constexpr size_t kThreadPoolSize = 24;
-    constexpr size_t kMaxActivePackets = 6;
+    constexpr size_t kMaxActivePackets = 4; 
+    // kMaxActivePackets is considered to be greater than Theoretical Max Throughput * average packet consume time 
 
     constexpr size_t kAdderInstances = 2;   // To register 2 adder resources
     constexpr size_t kMultiplierInstances = 2;  // To register 2 multiplier resources
@@ -76,14 +77,15 @@ int main(int argc, char **argv)
     constexpr int kMultiplierDelayMs = 10;
 
     auto resourcePool = std::make_shared<GryFlux::ResourcePool>();
-
     // Register limited resources: adder / multiplier
     {
         std::vector<std::shared_ptr<GryFlux::Context>> adderContexts;
         adderContexts.reserve(kAdderInstances);
         for (size_t i = 0; i < kAdderInstances; ++i)
         {
-            adderContexts.push_back(std::make_shared<SimulatedAdderContext>(static_cast<int>(i)));
+            adderContexts.push_back(std::make_shared<AdderContext>(
+                static_cast<int>(i),
+                kAdderDelayMs));
         }
         resourcePool->registerResourceType("adder", std::move(adderContexts));
     }
@@ -94,7 +96,9 @@ int main(int argc, char **argv)
         multiplierContexts.reserve(kMultiplierInstances);
         for (size_t i = 0; i < kMultiplierInstances; ++i)
         {
-            multiplierContexts.push_back(std::make_shared<SimulatedMultiplierContext>(static_cast<int>(i)));
+            multiplierContexts.push_back(std::make_shared<MultiplierContext>(
+                static_cast<int>(i),
+                kMultiplierDelayMs));
         }
         resourcePool->registerResourceType("multiplier", std::move(multiplierContexts));
     }
@@ -104,37 +108,37 @@ int main(int argc, char **argv)
 
     // Build graph template:
     // Layer 1: input
-    // Layer 2: b_mul, c_mul, d_add (depend on input)
-    // Layer 3: e_mul, f_mul, g_sum
-    // Layer 4: h_sum
-    // Layer 5: i_sum
+    // Layer 2: b_mul, c_sub, d_add (depend on input)
+    // Layer 3: e_div, f_mul, g_add
+    // Layer 4: h_add
+    // Layer 5: i_add
     // Layer 6: output
     // NOTE: CPU-only nodes do not depend on limited resources.
     auto graphTemplate = GryFlux::GraphTemplate::buildOnce(
         [=](GryFlux::TemplateBuilder *builder)
         {
             builder->setInputNode<PipelineNodes::InputNode>("input", kCpuDelayMs);
-            builder->addTask<PipelineNodes::BMulNode>("b_mul", "multiplier", {"input"}, kMultiplierDelayMs);
-            builder->addTask<PipelineNodes::CMulNode>("c_mul", "multiplier", {"input"}, kMultiplierDelayMs);
-            builder->addTask<PipelineNodes::DAddNode>("d_add", "", {"input"}, kCpuDelayMs);
+            builder->addTask<PipelineNodes::BMulConstNode>("b_mul", "multiplier", {"input"});
+            builder->addTask<PipelineNodes::CSubConstNode>("c_sub", "", {"input"}, kCpuDelayMs);
+            builder->addTask<PipelineNodes::DMulConstNode>("d_mul", "multiplier", {"input"});
 
-            builder->addTask<PipelineNodes::EMulNode>("e_mul", "", {"b_mul"}, kCpuDelayMs);
-            builder->addTask<PipelineNodes::FMulNode>("f_mul", "multiplier", {"b_mul"}, kMultiplierDelayMs);
-            builder->addTask<PipelineNodes::GSumNode>("g_sum", "adder", {"b_mul", "c_mul", "d_add"}, kAdderDelayMs);
+            builder->addTask<PipelineNodes::EDivConstNode>("e_div", "", {"b_mul"}, kCpuDelayMs);
+            builder->addTask<PipelineNodes::FMulConstNode>("f_mul", "multiplier", {"b_mul"});
+            builder->addTask<PipelineNodes::GAddNode>("g_add", "adder", {"b_mul", "c_sub", "d_mul"});
+            builder->addTask<PipelineNodes::HAddNode>("h_add", "adder", {"e_div", "f_mul", "g_add"});
 
-            builder->addTask<PipelineNodes::HSumNode>("h_sum", "adder", {"e_mul", "f_mul", "g_sum"}, kAdderDelayMs);
+            builder->addTask<PipelineNodes::IAddNode>("i_add", "adder", {"h_add", "d_mul"});
 
-            builder->addTask<PipelineNodes::ISumNode>("i_sum", "adder", {"h_sum", "c_mul"}, kAdderDelayMs);
-
-            builder->setOutputNode<PipelineNodes::OutputNode>("output", {"i_sum"}, kCpuDelayMs);
+            builder->setOutputNode<PipelineNodes::OutputNode>("output", {"i_add"}, kCpuDelayMs);
         });
 
-    LOG.info("Transformation: i = 19 * id + 3, output(j) = i");
+    LOG.info("Transformation: i = 18 * id - 1, output(j) = i");
 
     // -------------------- Step 3: Create Data Source --------------------
 
     constexpr int NUM_PACKETS = 300;
-    constexpr int producerTimeMs = 16; // ms per packet
+    constexpr int producerTimeMs = 15; // ms/packet
+    // producerTimeMs should be greater than (1 / Theoretical Max Throughput) to keep the system stable
     auto source = std::make_shared<SimpleDataSource>(NUM_PACKETS, producerTimeMs);
 
     LOG.info("Created SimpleDataSource with %d packets", NUM_PACKETS);
@@ -231,12 +235,12 @@ static double computeTheoreticalMaxThroughputPps(
     double multiplierDelayMs)
 {
     // Node counts by resource (current DAG):
-    // CPU: input, d_add, e_mul, output => 4 nodes
-    // adder: g_sum, h_sum, i_sum => 3 nodes
-    // multiplier: b_mul, c_mul, f_mul => 3 nodes
-    constexpr double kCpuNodesPerPacket = 4.0;
-    constexpr double kAdderNodesPerPacket = 3.0;
-    constexpr double kMultiplierNodesPerPacket = 3.0;
+    // CPU: input, c_sub, e_div, output => 4 nodes
+    // adder: g_add, h_add, i_add => 3 nodes
+    // multiplier: b_mul, d_mul, f_mul => 3 nodes
+    constexpr int kCpuNodesPerPacket = 4;
+    constexpr int kAdderNodesPerPacket = 3;
+    constexpr int kMultiplierNodesPerPacket = 3;
 
     const double totalWorkMs =
         kCpuNodesPerPacket * cpuDelayMs +

@@ -1,4 +1,4 @@
-#include "DAddNode.h"
+#include "EDivConstNode.h"
 
 #include "packet/simple_data_packet.h"
 #include "utils/logger.h"
@@ -9,17 +9,17 @@
 namespace PipelineNodes
 {
 
-void DAddNode::execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx)
+void EDivConstNode::execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx)
 {
     (void)ctx;
     auto &p = static_cast<SimpleDataPacket &>(packet);
 
     for (size_t i = 0; i < SimpleDataPacket::kVecSize; ++i)
     {
-        p.dVec[i] = p.aVec[i] + 3.0f;
+        p.eVec[i] = p.bVec[i] / 2.0f;
     }
 
-    LOG.debug("Packet %d: d[0] = a[0] + 3 = %.1f", p.id, p.dVec[0]);
+    LOG.debug("Packet %d: e[0] = b[0] / 2 = %.1f", p.id, p.eVec[0]);
 
     std::this_thread::sleep_for(std::chrono::milliseconds(delayMs_));
 }
