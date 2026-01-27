@@ -1,0 +1,93 @@
+<svg width="800" height="700" viewBox="0 0 800 700" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#555" />
+    </marker>
+    <style>
+      /* 基础文字样式 */
+      .text { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; text-anchor: middle; dominant-baseline: middle; font-weight: bold; }
+      
+      /* 增大后的箭头标注样式 */
+      .label-text { font-family: 'Consolas', monospace; font-size: 16px; fill: #E64A19; font-weight: 900; }
+      
+      .box { stroke-width: 2; }
+      
+      /* 颜色定义逻辑 */
+      .input-output { fill: #fce4ec; stroke: #880e4f; } /* 粉色：起止 */
+      .mul-box { fill: #e3f2fd; stroke: #1565c0; }      /* 蓝色：乘法 (mul) */
+      .add-box { fill: #fff8e1; stroke: #f9a825; }      /* 黄色：加法 (add) */
+      .cpu-box { fill: #ccff90; stroke: #388e3c; }      /* 绿色：CPU */
+
+      
+      .line { fill: none; stroke: #555; stroke-width: 1.5; marker-end: url(#arrowhead); }
+    </style>
+  </defs>
+
+  <!-- Level 0: Input -->
+  <ellipse cx="400" cy="50" rx="60" ry="25" class="box input-output" />
+  <text x="400" y="50" class="text">Input</text>
+
+  <!-- Level 1: b, c, d -->
+  <rect x="140" y="150" width="120" height="40" rx="5" class="box mul-box" />
+  <text x="200" y="170" class="text">BMul</text>
+  
+  <rect x="340" y="150" width="120" height="40" rx="5" class="box cpu-box" />
+  <text x="400" y="170" class="text">CSub</text>
+  
+  <rect x="540" y="150" width="120" height="40" rx="5" class="box mul-box" />
+  <text x="600" y="170" class="text">DMul</text>
+
+  <!-- Level 2: e, f, g_add -->
+  <rect x="40" y="280" width="100" height="40" rx="5" class="box cpu-box" />
+  <text x="90" y="300" class="text">EDiv</text>
+
+  <rect x="210" y="280" width="100" height="40" rx="5" class="box mul-box" />
+  <text x="260" y="300" class="text">FMul</text>
+
+  <rect x="440" y="280" width="120" height="40" rx="5" class="box add-box" />
+  <text x="500" y="300" class="text">GAdd</text>
+
+  <!-- Level 3: h_sum -->
+  <rect x="340" y="420" width="120" height="40" rx="5" class="box add-box" />
+  <text x="400" y="440" class="text">HAdd</text>
+
+  <!-- Level 4: i_sum -->
+  <rect x="340" y="540" width="120" height="40" rx="5" class="box add-box" />
+  <text x="400" y="560" class="text">IAdd</text>
+
+  <!-- Level 5: Output -->
+  <ellipse cx="400" cy="650" rx="60" ry="25" class="box input-output" />
+  <text x="400" y="650" class="text">Output</text>
+
+  <!-- 连线与标注 -->
+  <!-- input to b (*2) -->
+  <path d="M400,75 L200,150" class="line" />
+  <text x="285" y="110" class="label-text">*2</text>
+
+  <!-- input to c (-1) -->
+  <path d="M400,75 L400,150" class="line" />
+  <text x="405" y="110" class="label-text">-1</text>
+
+  <!-- input to d (*4) -->
+  <path d="M400,75 L600,150" class="line" />
+  <text x="500" y="110" class="label-text">*4</text>
+
+  <!-- b to e (*2) -->
+  <path d="M200,190 L90,280" class="line" />
+  <text x="130" y="230" class="label-text">/2</text>
+
+  <!-- b to f (*3) -->
+  <path d="M200,190 L260,280" class="line" />
+  <text x="230" y="230" class="label-text">*3</text>
+
+  <!-- 其他连线 (无标注) -->
+  <path d="M200,190 L440,285" class="line" />
+  <path d="M400,190 L490,280" class="line" />
+  <path d="M600,190 L510,280" class="line" />
+  <path d="M90,320 L340,425" class="line" />
+  <path d="M260,320 L360,420" class="line" />
+  <path d="M500,320 L420,420" class="line" />
+  <path d="M660,170 Q780,350 460,545" class="line" />
+  <path d="M400,460 L400,540" class="line" />
+  <path d="M400,580 L400,625" class="line" />
+</svg>

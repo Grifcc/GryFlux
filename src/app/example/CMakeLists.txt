@@ -1,26 +1,27 @@
-# Simple Pipeline Example
-add_executable(simple_pipeline_example
-    simple_pipeline_example.cpp
-    # Context resources
-    context/simulated_npu_context.cpp
-    context/simulated_tracker_context.cpp
-    # Data packets
-    packet/simple_data_packet.cpp
-    # Task nodes
-    nodes/input/input_node.cpp
-    nodes/preprocess/preprocess_node.cpp
-    nodes/inference/inference_node.cpp
-    nodes/postprocess/postprocess_node.cpp
-    nodes/output/output_node.cpp
+# example
+# Collect all node implementations under nodes/ automatically.
+# NOTE: GLOB is convenient for samples; CONFIGURE_DEPENDS makes CMake re-scan on file add/remove.
+file(GLOB_RECURSE EXAMPLE_NODE_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/nodes/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/nodes/*/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/nodes/*/*/*.cpp"
+)
+
+# Exclude legacy monolithic implementation (kept for reference only).
+list(FILTER EXAMPLE_NODE_SOURCES EXCLUDE REGEX "/nodes/dag_nodes\\.cpp$")
+
+add_executable(example
+    example.cpp
+    ${EXAMPLE_NODE_SOURCES}
     # Framework sources
     ${SRC_DIR}
 )
 
 # Add example directory as include path (allows #include "packet/xxx.h" style)
-target_include_directories(simple_pipeline_example PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(example PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
-target_link_libraries(simple_pipeline_example
+target_link_libraries(example
     ${dynamic_libs}
 )
 
-install(TARGETS simple_pipeline_example DESTINATION bin)
+install(TARGETS example DESTINATION bin)
