@@ -153,3 +153,5 @@ install/
 models/
 outputs/
 
+*.mp4
+
