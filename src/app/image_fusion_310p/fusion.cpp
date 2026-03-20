@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
 
     constexpr size_t kThreadPoolSize = 8;     // GryFlux 框架执行任务的 CPU 线程数
     constexpr size_t kMaxActivePackets = 16;  // 允许在流水线中同时排队流转的最大帧数
-    constexpr size_t kNpuInstances = 4;       // NPU 允许并发执行的模型实例数
+    constexpr size_t kNpuInstances = 2;       // NPU 允许并发执行的模型实例数
 
     // ==========================================
     // 3. 构建硬件资源池 (Resource Pool)

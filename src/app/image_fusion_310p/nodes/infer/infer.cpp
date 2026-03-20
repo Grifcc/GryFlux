@@ -6,6 +6,7 @@
 void InferNode::execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx) {
     auto &fusion_packet = static_cast<FusionDataPacket&>(packet);
     auto &infer_ctx = static_cast<InferContext&>(ctx);
+    infer_ctx.bindCurrentThread();  // 确保当前线程绑定到正确的 Device 上
 
     size_t inputSize = infer_ctx.GetInputSize();
     

@@ -27,6 +27,11 @@ public:
     void* GetVisDevPtr() const { return visDevPtr_; }
     void* GetIrDevPtr() const { return irDevPtr_; }
     void* GetOutDevPtr() const { return outDevPtr_; }
+    void bindCurrentThread() {
+        if (deviceId_ >= 0) {
+            aclrtSetDevice(deviceId_);
+        }
+    }
 
 private:
     int32_t deviceId_;
