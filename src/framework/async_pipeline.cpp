@@ -104,7 +104,7 @@ namespace GryFlux
         {
             while (running_ && processor_->getActivePacketCount() >= processor_->getMaxActivePackets())
             {
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                std::this_thread::yield();
             }
 
             if (!running_)
