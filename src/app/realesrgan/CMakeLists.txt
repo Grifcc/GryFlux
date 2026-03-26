@@ -39,7 +39,6 @@ set(RKNN_INCLUDE_DIR "${REALESRGAN_3RDPARTY_ROOT}/librknn_api/include")
 set(RKNN_LIB_DIR "${REALESRGAN_3RDPARTY_ROOT}/librknn_api/aarch64")
 set(RKNN_RUNTIME_LIB "${RKNN_LIB_DIR}/librknnrt.so")
 
-set(EIGEN_INCLUDE_DIR "${REALESRGAN_3RDPARTY_ROOT}/Eigen")
 
 set(OPENCV_CORE_LIB "${OPENCV_LIB_DIR}/libopencv_core.so")
 set(OPENCV_IMGPROC_LIB "${OPENCV_LIB_DIR}/libopencv_imgproc.so")
@@ -58,9 +57,6 @@ endif()
 if(NOT EXISTS "${RKNN_RUNTIME_LIB}")
     message(FATAL_ERROR "RKNN runtime not found: ${RKNN_RUNTIME_LIB}")
 endif()
-if(NOT EXISTS "${EIGEN_INCLUDE_DIR}")
-    message(FATAL_ERROR "Eigen include dir not found: ${EIGEN_INCLUDE_DIR}")
-endif()
 if(NOT EXISTS "${OPENCV_CORE_LIB}")
     message(FATAL_ERROR "OpenCV runtime lib not found: ${OPENCV_CORE_LIB}")
 endif()
@@ -77,7 +73,6 @@ endif()
 target_include_directories(realesrgan PRIVATE
     ${OPENCV_INCLUDE_DIR_OPENCV4}
     ${RKNN_INCLUDE_DIR}
-    ${EIGEN_INCLUDE_DIR}
 )
 
 target_link_directories(realesrgan PRIVATE

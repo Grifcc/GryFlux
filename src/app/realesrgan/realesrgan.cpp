@@ -11,7 +11,6 @@
 #include "source/image_dir_source.h"
 
 #include <chrono>
-#include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <string>
@@ -23,9 +22,6 @@ void printHelp()
 {
     LOG.info("Usage: realesrgan <model_path> <dataset_dir> [output_dir] [options]");
     LOG.info("Options:");
-    LOG.info("  --npu-instances <N>  NPU context instances (default: 1)");
-    LOG.info("  --threads <N>        Pipeline thread pool size (default: 10)");
-    LOG.info("  --max-active <N>     Max active packets (default: 8)");
     LOG.info("  --profile            Enable GryFlux profiling");
     LOG.info("  --help,-h            Show help and exit");
 }
@@ -55,20 +51,10 @@ int main(int argc, char **argv)
     }
 
     bool enableProfiling = false;
-    size_t npuInstances = 1;
-    size_t threadPoolSize = 10;
-    size_t maxActivePackets = 8;
 
-    auto requireValue = [&](int &i) -> const char *
-    {
-        if (i + 1 >= argc)
-        {
-            LOG.error("Missing value for option: %s", argv[i]);
-            printHelp();
-            std::exit(-1);
-        }
-        return argv[++i];
-    };
+    constexpr size_t kNpuInstances = 3;
+    constexpr size_t kThreadPoolSize = 10;
+    constexpr size_t kMaxActivePackets = 8;
 
     for (int i = argIndex; i < argc; ++i)
     {
@@ -82,22 +68,6 @@ int main(int argc, char **argv)
             enableProfiling = true;
             continue;
         }
-        if (!std::strcmp(argv[i], "--npu-instances"))
-        {
-            npuInstances = static_cast<size_t>(std::stoul(requireValue(i)));
-            continue;
-        }
-        if (!std::strcmp(argv[i], "--threads"))
-        {
-            threadPoolSize = static_cast<size_t>(std::stoul(requireValue(i)));
-            continue;
-        }
-        if (!std::strcmp(argv[i], "--max-active"))
-        {
-            maxActivePackets = static_cast<size_t>(std::stoul(requireValue(i)));
-            continue;
-        }
-
         LOG.error("Unsupported option: %s", argv[i]);
         printHelp();
         return -1;
@@ -118,8 +88,8 @@ int main(int argc, char **argv)
         auto resourcePool = std::make_shared<GryFlux::ResourcePool>();
         {
             std::vector<std::shared_ptr<GryFlux::Context>> npuContexts;
-            npuContexts.reserve(npuInstances);
-            for (size_t i = 0; i < npuInstances; ++i)
+            npuContexts.reserve(kNpuInstances);
+            for (size_t i = 0; i < kNpuInstances; ++i)
             {
                 npuContexts.push_back(std::make_shared<NpuContext>(
                     static_cast<int>(i),
@@ -148,8 +118,8 @@ int main(int argc, char **argv)
             graphTemplate,
             resourcePool,
             consumer,
-            threadPoolSize,
-            maxActivePackets);
+            kThreadPoolSize,
+            kMaxActivePackets);
 
         if (enableProfiling)
         {

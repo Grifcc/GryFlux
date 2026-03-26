@@ -10,7 +10,6 @@
 
 - OpenCV: `src/app/realesrgan/3rdparty/opencv`
 - RKNN: `src/app/realesrgan/3rdparty/librknn_api`
-- Eigen: `src/app/realesrgan/3rdparty/Eigen`
 
 默认 `3rdparty` 根目录为 `src/app/realesrgan/3rdparty`，也可覆盖：
 
@@ -21,7 +20,7 @@ cmake .. -DREALESRGAN_3RDPARTY_ROOT=/abs/path/to/realesrgan/3rdparty
 交叉编译示例：
 
 ```bash
-cd /workspace/gxh/GryFlux
+cd /path/to/root
 mkdir -p build-aarch64
 cd build-aarch64
 cmake .. \
@@ -36,7 +35,7 @@ make -j8 realesrgan
 
 ```bash
 ./realesrgan <model_path> <dataset_dir> [output_dir] \
-  [--npu-instances N] [--threads N] [--max-active N] [--profile]
+  [--profile]
 ```
 
 说明：
