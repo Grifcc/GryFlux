@@ -1,0 +1,20 @@
+运行命令通用模板:
+
+./src/app/OrangePi/deeplab/deeplab <image_dir> <label_dir> [model_path] [npu_instances] [thread_pool_size] [max_active_packets]
+
+参数说明:
+
+<image_dir>         图片目录, 必填
+<label_dir>         标签目录, 必填
+[model_path]        om 模型路径, 可选; 不传时默认使用当前目录下 model/deeplabv3_int8.om
+[npu_instances]     NPU 实例数, 可选; 默认 1
+[thread_pool_size]  线程池大小, 可选; 默认 8
+[max_active_packets]最大并发 packet 数, 可选; 默认 4
+
+带日志查看的常用写法:
+
+./src/app/OrangePi/deeplab/deeplab <image_dir> <label_dir> [model_path] [npu_instances] [thread_pool_size] [max_active_packets] 2>&1 | tail -n 40
+
+示例:
+
+./src/app/OrangePi/deeplab/deeplab /path/to/JPEGImages /path/to/SegmentationClass /path/to/deeplabv3_int8.om 1 4 4

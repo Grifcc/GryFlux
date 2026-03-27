@@ -1,0 +1,60 @@
+<svg width="800" height="700" viewBox="0 0 800 700" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#555" />
+    </marker>
+    <style>
+      /* 基础文字样式 */
+      .text { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; text-anchor: middle; dominant-baseline: middle; font-weight: bold; }
+      
+      /* 箭头标注样式 */
+      .label-text { font-family: 'Consolas', monospace; font-size: 14px; fill: #E64A19; font-weight: 900; }
+      
+      .box { stroke-width: 2; }
+      
+      /* 颜色定义逻辑 */
+      .input-output { fill: #fce4ec; stroke: #880e4f; } /* 粉色：起止 */
+      .cpu-box { fill: #ccff90; stroke: #388e3c; }      /* 绿色：无限制的 CPU 资源 */
+      .npu-box { fill: #ffcdd2; stroke: #c62828; }      /* 红色：受限的 NPU 资源 (新增) */
+      
+      .line { fill: none; stroke: #555; stroke-width: 1.5; marker-end: url(#arrowhead); }
+    </style>
+  </defs>
+
+  <ellipse cx="400" cy="50" rx="80" ry="25" class="box input-output" />
+  <text x="400" y="50" class="text">InputNode</text>
+
+  <rect x="180" y="180" width="160" height="40" rx="5" class="box cpu-box" />
+  <text x="260" y="200" class="text">Preprocess (CPU)</text>
+
+  <rect x="460" y="180" width="160" height="40" rx="5" class="box cpu-box" />
+  <text x="540" y="200" class="text">GtProcess (CPU)</text>
+
+  <rect x="180" y="330" width="160" height="40" rx="5" class="box npu-box" />
+  <text x="260" y="350" class="text">Inference (NPU)</text>
+
+  <rect x="180" y="480" width="160" height="40" rx="5" class="box cpu-box" />
+  <text x="260" y="500" class="text">Postprocess (CPU)</text>
+
+  <ellipse cx="400" cy="650" rx="80" ry="25" class="box input-output" />
+  <text x="400" y="650" class="text">MiouNode (Output)</text>
+
+  <path d="M380,75 L280,180" class="line" />
+  <text x="280" y="120" class="label-text">Image Path</text>
+
+  <path d="M420,75 L520,180" class="line" />
+  <text x="520" y="120" class="label-text">Label Path</text>
+
+  <path d="M260,220 L260,330" class="line" />
+  <text x="320" y="275" class="label-text">Input Tensor</text>
+
+  <path d="M260,370 L260,480" class="line" />
+  <text x="325" y="425" class="label-text">Output Tensor</text>
+
+  <path d="M260,520 L380,630" class="line" />
+  <text x="280" y="590" class="label-text">Pred Mask</text>
+
+  <path d="M540,220 Q540,425 420,630" class="line" />
+  <text x="505" y="425" class="label-text">GT Mask</text>
+
+</svg>
