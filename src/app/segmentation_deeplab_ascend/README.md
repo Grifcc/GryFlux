@@ -1,4 +1,4 @@
-# GryFlux DeepLab Demo
+# GryFlux Segmentation DeepLab Ascend
 
 ## 简介
 
@@ -16,6 +16,25 @@
 - `postprocess` 负责将模型输出转换为预测 mask
 - `gt_process` 和 `miou` 负责读取标注并统计每张图与整套数据集的 MIoU
 
+## 模型介绍
+
+当前示例使用的是 DeepLabV3 语义分割模型的 Ascend OM 版本，用于对输入图像做像素级分类。
+
+- 任务类型: 语义分割
+- 输入规格: `3 x 513 x 513`
+- 输出规格: `65 x 65 x 21`
+- 类别数量: `21` 类, 与 VOC 数据集类别定义一致
+
+当前代码中的模型处理流程如下：
+
+- 前处理会将输入图片 resize 到 `513 x 513`
+- 图像从 BGR 转为 RGB
+- 像素值按 `x / 127.5 - 1.0` 归一化到 `[-1, 1]`
+- 模型输出会在每个像素位置上对 `21` 个类别做 argmax
+- 后处理会将预测结果用最近邻插值 resize 回原图尺寸
+
+评估阶段会结合标签图统计每张图的 `image MIoU`，并汇总输出整套数据集的 `Dataset MIoU`。
+
 ## 目录说明
 
 - `go.cpp`: 程序入口
@@ -23,8 +42,6 @@
 - `source/`: 数据集扫描与样本生成
 - `nodes/`: 预处理、推理、后处理、指标计算节点
 - `consumer/`: 汇总输出每张图和数据集的 MIoU
-- `model/`: 默认模型目录，当前默认模型文件为 `deeplabv3_int8.om`
-- `commend.txt`: 运行命令模板
 
 ## 依赖
 
@@ -54,7 +71,7 @@ cmake --build /root/workspace/hry/GryFlux/build --target deeplab -j
 构建成功后，二进制通常位于：
 
 ```bash
-/root/workspace/hry/GryFlux/build/src/app/OrangePi/deeplab/deeplab
+/root/workspace/hry/GryFlux/build/src/app/segmentation_deeplab_ascend/deeplab
 ```
 
 如果执行了安装步骤：
@@ -76,14 +93,14 @@ cmake --install /root/workspace/hry/GryFlux/build
 程序参数如下：
 
 ```bash
-./src/app/OrangePi/deeplab/deeplab <image_dir> <label_dir> [model_path] [npu_instances] [thread_pool_size] [max_active_packets]
+./src/app/segmentation_deeplab_ascend/deeplab <image_dir> <label_dir> <model_path> [npu_instances] [thread_pool_size] [max_active_packets]
 ```
 
 参数说明：
 
 - `<image_dir>`: 输入图片目录，必填
 - `<label_dir>`: 标签目录，必填
-- `[model_path]`: 模型路径，可选；不传时默认使用当前目录下 `model/deeplabv3_int8.om`
+- `<model_path>`: 模型路径，必填
 - `[npu_instances]`: NPU 实例数，可选，默认 `1`
 - `[thread_pool_size]`: 线程池大小，可选，默认 `8`
 - `[max_active_packets]`: 最大并发包数，可选，默认 `4`
@@ -91,7 +108,7 @@ cmake --install /root/workspace/hry/GryFlux/build
 示例：
 
 ```bash
-./src/app/OrangePi/deeplab/deeplab \
+./src/app/segmentation_deeplab_ascend/deeplab \
   /path/to/JPEGImages \
   /path/to/SegmentationClass \
   /path/to/deeplabv3_int8.om \
@@ -101,14 +118,12 @@ cmake --install /root/workspace/hry/GryFlux/build
 如果想边运行边看最后一段日志：
 
 ```bash
-./src/app/OrangePi/deeplab/deeplab \
+./src/app/segmentation_deeplab_ascend/deeplab \
   /path/to/JPEGImages \
   /path/to/SegmentationClass \
   /path/to/deeplabv3_int8.om \
   1 8 4 2>&1 | tail -n 40
 ```
-
-也可以直接参考同目录下的 `commend.txt`。
 
 ## 数据集要求
 
@@ -132,19 +147,10 @@ cmake --install /root/workspace/hry/GryFlux/build
 
 类别名当前按 VOC 21 类定义，统计逻辑位于 `consumer/deeplab_result_consumer.cpp`。
 
-## 默认模型路径
-
-如果第三个参数 `model_path` 不传，程序会默认加载：
-
-```bash
-src/app/OrangePi/deeplab/model/deeplabv3_int8.om
-```
-
-默认路径逻辑位于 `go.cpp`。如果后续你再次移动模型文件，需要同步修改那里，或者运行时显式传入新模型路径。
-
 ## 常见注意事项
 
 - 目录改名或迁移后，记得同步检查上层 `src/app/CMakeLists.txt` 中的 `add_subdirectory(...)`
+- `model_path` 现在是必填参数，运行时必须显式传入 om 模型路径
 - 当前程序会校验 `image_dir`、`label_dir` 和 `model_path` 是否存在，不存在会直接抛错退出
 - `npu_instances` 应与可用设备数量相匹配，否则 ACL 初始化或设备绑定可能失败
 - 如果开启了 profiling 编译选项，运行结束后会生成 `deeplab_timeline.json`

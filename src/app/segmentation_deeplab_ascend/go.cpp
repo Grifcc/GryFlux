@@ -1,5 +1,5 @@
 /*************************************************************************************************************************
- * GryFlux Framework - DeepLab Async Demo
+ * GryFlux Framework - segmentation_deeplab_ascend Async Demo
  *************************************************************************************************************************/
 
 #include "framework/async_pipeline.h"
@@ -19,6 +19,7 @@
 #include <chrono>
 #include <filesystem>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -27,17 +28,76 @@
 namespace
 {
 
-std::filesystem::path defaultModelPath()
+void printUsage(const char *programName)
 {
-    return std::filesystem::path(__FILE__).parent_path() / "model" / "deeplabv3_int8.om";
+    std::cerr
+        << "Usage: " << programName
+        << " <image_dir> <label_dir> <model_path> [npu_instances] [thread_pool_size] [max_active_packets]\n";
+}
+
+void validateArgCount(int argc, char **argv)
+{
+    if (argc < 4)
+    {
+        static const char *kRequiredArgs[] = {"image_dir", "label_dir", "model_path"};
+        const int missingIndex = argc - 1;
+        const std::string missingArg =
+            (missingIndex >= 0 && missingIndex < 3) ? kRequiredArgs[missingIndex] : "unknown";
+
+        printUsage(argv[0]);
+        throw std::runtime_error("missing required argument: " + missingArg);
+    }
+
+    if (argc > 7)
+    {
+        printUsage(argv[0]);
+        throw std::runtime_error("too many arguments: unexpected extra parameter '" + std::string(argv[7]) + "'");
+    }
 }
 
 void validatePathExists(const std::filesystem::path &path, const std::string &label)
 {
     if (!std::filesystem::exists(path))
     {
-        throw std::runtime_error(label + " does not exist: " + path.string());
+        throw std::runtime_error("invalid " + label + ": path does not exist: " + path.string());
     }
+}
+
+size_t parsePositiveSizeArgument(const char *argValue, const std::string &label)
+{
+    const std::string value = (argValue != nullptr) ? std::string(argValue) : std::string();
+    if (value.empty())
+    {
+        throw std::runtime_error("invalid " + label + ": value is empty");
+    }
+
+    size_t parsedChars = 0;
+    unsigned long long parsedValue = 0;
+    try
+    {
+        parsedValue = std::stoull(value, &parsedChars, 10);
+    }
+    catch (const std::exception &)
+    {
+        throw std::runtime_error("invalid " + label + ": '" + value + "' is not a positive integer");
+    }
+
+    if (parsedChars != value.size())
+    {
+        throw std::runtime_error("invalid " + label + ": '" + value + "' contains non-numeric characters");
+    }
+
+    if (parsedValue == 0)
+    {
+        throw std::runtime_error("invalid " + label + ": value must be greater than 0");
+    }
+
+    if (parsedValue > static_cast<unsigned long long>(std::numeric_limits<size_t>::max()))
+    {
+        throw std::runtime_error("invalid " + label + ": value is too large");
+    }
+
+    return static_cast<size_t>(parsedValue);
 }
 
 } // namespace
@@ -48,20 +108,14 @@ int main(int argc, char **argv)
 
     try
     {
-        if (argc < 3)
-        {
-            std::cerr
-                << "Usage: " << argv[0]
-                << " <image_dir> <label_dir> [model_path] [npu_instances] [thread_pool_size] [max_active_packets]\n";
-            return 1;
-        }
+        validateArgCount(argc, argv);
 
         const std::filesystem::path imageDir = argv[1];
         const std::filesystem::path labelDir = argv[2];
-        const std::filesystem::path modelPath = (argc >= 4) ? std::filesystem::path(argv[3]) : defaultModelPath();
-        const size_t npuInstances = (argc >= 5) ? static_cast<size_t>(std::stoul(argv[4])) : 1;
-        const size_t threadPoolSize = (argc >= 6) ? static_cast<size_t>(std::stoul(argv[5])) : 8;
-        const size_t maxActivePackets = (argc >= 7) ? static_cast<size_t>(std::stoul(argv[6])) : 4;
+        const std::filesystem::path modelPath = argv[3];
+        const size_t npuInstances = (argc >= 5) ? parsePositiveSizeArgument(argv[4], "npu_instances") : 1;
+        const size_t threadPoolSize = (argc >= 6) ? parsePositiveSizeArgument(argv[5], "thread_pool_size") : 8;
+        const size_t maxActivePackets = (argc >= 7) ? parsePositiveSizeArgument(argv[6], "max_active_packets") : 4;
 
         validatePathExists(imageDir, "image_dir");
         validatePathExists(labelDir, "label_dir");
@@ -71,9 +125,9 @@ int main(int argc, char **argv)
         LOG.setOutputType(GryFlux::LogOutputType::CONSOLE);
         LOG.setAppName("deeplab");
 
-        LOG.info("========================================");
-        LOG.info("  GryFlux DeepLab Async Demo");
-        LOG.info("========================================");
+        LOG.info("=======================================================");
+        LOG.info("  GryFlux segmentation_deeplab_ascend Async Demo");
+        LOG.info("=======================================================");
         LOG.info("Image dir : %s", imageDir.string().c_str());
         LOG.info("Label dir : %s", labelDir.string().c_str());
         LOG.info("Model path: %s", modelPath.string().c_str());
@@ -167,6 +221,7 @@ int main(int argc, char **argv)
     }
     catch (const std::exception &e)
     {
+        std::cerr << "Error: " << e.what() << '\n';
         LOG.error("DeepLab app failed: %s", e.what());
 
         if (aclInitialized)

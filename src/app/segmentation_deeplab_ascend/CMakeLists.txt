@@ -16,7 +16,7 @@
   endif()
 
   if(DEEPLAB_MAIN_FILE STREQUAL "")
-      message(STATUS "go.cpp/deeplab.cpp not found under src/app/OrangePi/deeplab, skip building target 'deeplab'")
+      message(STATUS "go.cpp/deeplab.cpp not found under src/app/segmentation_deeplab_ascend, skip building target 'deeplab'")
       return()
   endif()
 

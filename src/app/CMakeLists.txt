@@ -1,2 +1,2 @@
 add_subdirectory(example)
-add_subdirectory(OrangePi/deeplab)
+add_subdirectory(segmentation_deeplab_ascend)
