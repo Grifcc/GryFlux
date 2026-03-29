@@ -1,0 +1,868 @@
+{
+  "events": [
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000000000000,
+      "node": "preprocess",
+      "packet_id": 0,
+      "thread": "producer",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000001000000,
+      "node": "preprocess",
+      "packet_id": 0,
+      "thread": "cpu_pre_0",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000010000000,
+      "node": "preprocess",
+      "packet_id": 0,
+      "thread": "cpu_pre_0",
+      "duration_ns": 9000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000011000000,
+      "node": "inference",
+      "packet_id": 0,
+      "thread": "scheduler",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000012000000,
+      "node": "inference",
+      "packet_id": 0,
+      "thread": "atlas_ctx0",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000030000000,
+      "node": "inference",
+      "packet_id": 0,
+      "thread": "atlas_ctx0",
+      "duration_ns": 18000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000031000000,
+      "node": "postprocess",
+      "packet_id": 0,
+      "thread": "scheduler",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000032000000,
+      "node": "postprocess",
+      "packet_id": 0,
+      "thread": "cpu_post_0",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000039000000,
+      "node": "postprocess",
+      "packet_id": 0,
+      "thread": "cpu_post_0",
+      "duration_ns": 7000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000010000000,
+      "node": "preprocess",
+      "packet_id": 1,
+      "thread": "producer",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000011000000,
+      "node": "preprocess",
+      "packet_id": 1,
+      "thread": "cpu_pre_1",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000020000000,
+      "node": "preprocess",
+      "packet_id": 1,
+      "thread": "cpu_pre_1",
+      "duration_ns": 9000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000021000000,
+      "node": "inference",
+      "packet_id": 1,
+      "thread": "scheduler",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000022000000,
+      "node": "inference",
+      "packet_id": 1,
+      "thread": "atlas_ctx1",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000040000000,
+      "node": "inference",
+      "packet_id": 1,
+      "thread": "atlas_ctx1",
+      "duration_ns": 18000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000041000000,
+      "node": "postprocess",
+      "packet_id": 1,
+      "thread": "scheduler",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000042000000,
+      "node": "postprocess",
+      "packet_id": 1,
+      "thread": "cpu_post_1",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000049000000,
+      "node": "postprocess",
+      "packet_id": 1,
+      "thread": "cpu_post_1",
+      "duration_ns": 7000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000020000000,
+      "node": "preprocess",
+      "packet_id": 2,
+      "thread": "producer",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000021000000,
+      "node": "preprocess",
+      "packet_id": 2,
+      "thread": "cpu_pre_0",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000030000000,
+      "node": "preprocess",
+      "packet_id": 2,
+      "thread": "cpu_pre_0",
+      "duration_ns": 9000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000031000000,
+      "node": "inference",
+      "packet_id": 2,
+      "thread": "scheduler",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000032000000,
+      "node": "inference",
+      "packet_id": 2,
+      "thread": "atlas_ctx0",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000050000000,
+      "node": "inference",
+      "packet_id": 2,
+      "thread": "atlas_ctx0",
+      "duration_ns": 18000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000051000000,
+      "node": "postprocess",
+      "packet_id": 2,
+      "thread": "scheduler",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000052000000,
+      "node": "postprocess",
+      "packet_id": 2,
+      "thread": "cpu_post_0",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000059000000,
+      "node": "postprocess",
+      "packet_id": 2,
+      "thread": "cpu_post_0",
+      "duration_ns": 7000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000030000000,
+      "node": "preprocess",
+      "packet_id": 3,
+      "thread": "producer",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000031000000,
+      "node": "preprocess",
+      "packet_id": 3,
+      "thread": "cpu_pre_1",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000040000000,
+      "node": "preprocess",
+      "packet_id": 3,
+      "thread": "cpu_pre_1",
+      "duration_ns": 9000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000041000000,
+      "node": "inference",
+      "packet_id": 3,
+      "thread": "scheduler",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000042000000,
+      "node": "inference",
+      "packet_id": 3,
+      "thread": "atlas_ctx1",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000060000000,
+      "node": "inference",
+      "packet_id": 3,
+      "thread": "atlas_ctx1",
+      "duration_ns": 18000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000061000000,
+      "node": "postprocess",
+      "packet_id": 3,
+      "thread": "scheduler",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000062000000,
+      "node": "postprocess",
+      "packet_id": 3,
+      "thread": "cpu_post_1",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000069000000,
+      "node": "postprocess",
+      "packet_id": 3,
+      "thread": "cpu_post_1",
+      "duration_ns": 7000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000040000000,
+      "node": "preprocess",
+      "packet_id": 4,
+      "thread": "producer",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000041000000,
+      "node": "preprocess",
+      "packet_id": 4,
+      "thread": "cpu_pre_0",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000050000000,
+      "node": "preprocess",
+      "packet_id": 4,
+      "thread": "cpu_pre_0",
+      "duration_ns": 9000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000051000000,
+      "node": "inference",
+      "packet_id": 4,
+      "thread": "scheduler",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000052000000,
+      "node": "inference",
+      "packet_id": 4,
+      "thread": "atlas_ctx0",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000070000000,
+      "node": "inference",
+      "packet_id": 4,
+      "thread": "atlas_ctx0",
+      "duration_ns": 18000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000071000000,
+      "node": "postprocess",
+      "packet_id": 4,
+      "thread": "scheduler",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000072000000,
+      "node": "postprocess",
+      "packet_id": 4,
+      "thread": "cpu_post_0",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000079000000,
+      "node": "postprocess",
+      "packet_id": 4,
+      "thread": "cpu_post_0",
+      "duration_ns": 7000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000050000000,
+      "node": "preprocess",
+      "packet_id": 5,
+      "thread": "producer",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000051000000,
+      "node": "preprocess",
+      "packet_id": 5,
+      "thread": "cpu_pre_1",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000060000000,
+      "node": "preprocess",
+      "packet_id": 5,
+      "thread": "cpu_pre_1",
+      "duration_ns": 9000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000061000000,
+      "node": "inference",
+      "packet_id": 5,
+      "thread": "scheduler",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000062000000,
+      "node": "inference",
+      "packet_id": 5,
+      "thread": "atlas_ctx1",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000080000000,
+      "node": "inference",
+      "packet_id": 5,
+      "thread": "atlas_ctx1",
+      "duration_ns": 18000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000081000000,
+      "node": "postprocess",
+      "packet_id": 5,
+      "thread": "scheduler",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000082000000,
+      "node": "postprocess",
+      "packet_id": 5,
+      "thread": "cpu_post_1",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000089000000,
+      "node": "postprocess",
+      "packet_id": 5,
+      "thread": "cpu_post_1",
+      "duration_ns": 7000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000060000000,
+      "node": "preprocess",
+      "packet_id": 6,
+      "thread": "producer",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000061000000,
+      "node": "preprocess",
+      "packet_id": 6,
+      "thread": "cpu_pre_0",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000070000000,
+      "node": "preprocess",
+      "packet_id": 6,
+      "thread": "cpu_pre_0",
+      "duration_ns": 9000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000071000000,
+      "node": "inference",
+      "packet_id": 6,
+      "thread": "scheduler",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000072000000,
+      "node": "inference",
+      "packet_id": 6,
+      "thread": "atlas_ctx0",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000090000000,
+      "node": "inference",
+      "packet_id": 6,
+      "thread": "atlas_ctx0",
+      "duration_ns": 18000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000091000000,
+      "node": "postprocess",
+      "packet_id": 6,
+      "thread": "scheduler",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000092000000,
+      "node": "postprocess",
+      "packet_id": 6,
+      "thread": "cpu_post_0",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000099000000,
+      "node": "postprocess",
+      "packet_id": 6,
+      "thread": "cpu_post_0",
+      "duration_ns": 7000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000070000000,
+      "node": "preprocess",
+      "packet_id": 7,
+      "thread": "producer",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000071000000,
+      "node": "preprocess",
+      "packet_id": 7,
+      "thread": "cpu_pre_1",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000080000000,
+      "node": "preprocess",
+      "packet_id": 7,
+      "thread": "cpu_pre_1",
+      "duration_ns": 9000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000081000000,
+      "node": "inference",
+      "packet_id": 7,
+      "thread": "scheduler",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000082000000,
+      "node": "inference",
+      "packet_id": 7,
+      "thread": "atlas_ctx1",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000100000000,
+      "node": "inference",
+      "packet_id": 7,
+      "thread": "atlas_ctx1",
+      "duration_ns": 18000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000101000000,
+      "node": "postprocess",
+      "packet_id": 7,
+      "thread": "scheduler",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000102000000,
+      "node": "postprocess",
+      "packet_id": 7,
+      "thread": "cpu_post_1",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000109000000,
+      "node": "postprocess",
+      "packet_id": 7,
+      "thread": "cpu_post_1",
+      "duration_ns": 7000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000080000000,
+      "node": "preprocess",
+      "packet_id": 8,
+      "thread": "producer",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000081000000,
+      "node": "preprocess",
+      "packet_id": 8,
+      "thread": "cpu_pre_0",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000090000000,
+      "node": "preprocess",
+      "packet_id": 8,
+      "thread": "cpu_pre_0",
+      "duration_ns": 9000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000091000000,
+      "node": "inference",
+      "packet_id": 8,
+      "thread": "scheduler",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000092000000,
+      "node": "inference",
+      "packet_id": 8,
+      "thread": "atlas_ctx0",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000110000000,
+      "node": "inference",
+      "packet_id": 8,
+      "thread": "atlas_ctx0",
+      "duration_ns": 18000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000111000000,
+      "node": "postprocess",
+      "packet_id": 8,
+      "thread": "scheduler",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000112000000,
+      "node": "postprocess",
+      "packet_id": 8,
+      "thread": "cpu_post_0",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000119000000,
+      "node": "postprocess",
+      "packet_id": 8,
+      "thread": "cpu_post_0",
+      "duration_ns": 7000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000090000000,
+      "node": "preprocess",
+      "packet_id": 9,
+      "thread": "producer",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000091000000,
+      "node": "preprocess",
+      "packet_id": 9,
+      "thread": "cpu_pre_1",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000100000000,
+      "node": "preprocess",
+      "packet_id": 9,
+      "thread": "cpu_pre_1",
+      "duration_ns": 9000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000101000000,
+      "node": "inference",
+      "packet_id": 9,
+      "thread": "scheduler",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000102000000,
+      "node": "inference",
+      "packet_id": 9,
+      "thread": "atlas_ctx1",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000120000000,
+      "node": "inference",
+      "packet_id": 9,
+      "thread": "atlas_ctx1",
+      "duration_ns": 18000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000121000000,
+      "node": "postprocess",
+      "packet_id": 9,
+      "thread": "scheduler",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000122000000,
+      "node": "postprocess",
+      "packet_id": 9,
+      "thread": "cpu_post_1",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000129000000,
+      "node": "postprocess",
+      "packet_id": 9,
+      "thread": "cpu_post_1",
+      "duration_ns": 7000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000100000000,
+      "node": "preprocess",
+      "packet_id": 10,
+      "thread": "producer",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000101000000,
+      "node": "preprocess",
+      "packet_id": 10,
+      "thread": "cpu_pre_0",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000110000000,
+      "node": "preprocess",
+      "packet_id": 10,
+      "thread": "cpu_pre_0",
+      "duration_ns": 9000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000111000000,
+      "node": "inference",
+      "packet_id": 10,
+      "thread": "scheduler",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000112000000,
+      "node": "inference",
+      "packet_id": 10,
+      "thread": "atlas_ctx0",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000130000000,
+      "node": "inference",
+      "packet_id": 10,
+      "thread": "atlas_ctx0",
+      "duration_ns": 18000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000131000000,
+      "node": "postprocess",
+      "packet_id": 10,
+      "thread": "scheduler",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000132000000,
+      "node": "postprocess",
+      "packet_id": 10,
+      "thread": "cpu_post_0",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000139000000,
+      "node": "postprocess",
+      "packet_id": 10,
+      "thread": "cpu_post_0",
+      "duration_ns": 7000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000110000000,
+      "node": "preprocess",
+      "packet_id": 11,
+      "thread": "producer",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000111000000,
+      "node": "preprocess",
+      "packet_id": 11,
+      "thread": "cpu_pre_1",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000120000000,
+      "node": "preprocess",
+      "packet_id": 11,
+      "thread": "cpu_pre_1",
+      "duration_ns": 9000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000121000000,
+      "node": "inference",
+      "packet_id": 11,
+      "thread": "scheduler",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000122000000,
+      "node": "inference",
+      "packet_id": 11,
+      "thread": "atlas_ctx1",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000140000000,
+      "node": "inference",
+      "packet_id": 11,
+      "thread": "atlas_ctx1",
+      "duration_ns": 18000000
+    },
+    {
+      "type": "scheduled",
+      "timestamp_ns": 1743000000141000000,
+      "node": "postprocess",
+      "packet_id": 11,
+      "thread": "scheduler",
+      "duration_ns": 0
+    },
+    {
+      "type": "started",
+      "timestamp_ns": 1743000000142000000,
+      "node": "postprocess",
+      "packet_id": 11,
+      "thread": "cpu_post_1",
+      "duration_ns": 0
+    },
+    {
+      "type": "finished",
+      "timestamp_ns": 1743000000149000000,
+      "node": "postprocess",
+      "packet_id": 11,
+      "thread": "cpu_post_1",
+      "duration_ns": 7000000
+    }
+  ]
+}
