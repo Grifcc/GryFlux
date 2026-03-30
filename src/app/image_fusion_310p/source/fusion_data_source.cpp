@@ -42,7 +42,7 @@ std::unique_ptr<GryFlux::DataPacket> FusionDataSource::produce() {
         packet->packet_idx = current_idx_++; // 赋值并自增
         packet->filename = visFilename;
         
-        // 【性能优化】：使用 std::move 转移 cv::Mat 内部指针所有权，避免数据深拷贝
+        // 使用 std::move 转移 cv::Mat 内部指针所有权，避免数据深拷贝
         packet->vis_raw = std::move(visRaw); 
         packet->ir_raw = std::move(irRaw);
 

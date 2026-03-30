@@ -6,14 +6,10 @@
 #include "track.h"        // 包含 Track 类的定义
 #include "kalman_filter.h"           // 包含 MyKalmanFilter 定义
 
-// *** 修正点 1: 确保包含 Eigen Matrix 定义 ***
 #include <Eigen/Dense> // 包含 MatrixXf
 
-// *** 修正点 2: 定义 DYNAMICM (放在使用之前) ***
 using DYNAMICM = Eigen::MatrixXf; // 或者 Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
 
-// 假设 common/package.h 定义了:
-// using DETECTIONS = std::vector<DETECTION_ROW>;
 using MATCH_DATA = std::pair<int, int>; // 定义匹配对类型
 
 struct TRACKER_MATCHD {

@@ -26,7 +26,6 @@ void Track::predict(MyKalmanFilter* kf) {
 void Track::update(MyKalmanFilter* kf, const DETECTION_ROW& detection) {
     // std::cout << "[DEBUG] Track " << track_id << " 准备 Update. 匹配前 cx: " << mean(0) << std::endl;
 
-    // 【致命修复】：update 有返回值 KAL_DATA，必须接收并覆盖当前的 mean 和 covariance！
     KAL_DATA res = kf->update(this->mean, this->covariance, detection.to_xyah());
     this->mean = res.first;
     this->covariance = res.second;

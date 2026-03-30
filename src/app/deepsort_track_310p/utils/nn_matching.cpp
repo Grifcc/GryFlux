@@ -97,12 +97,10 @@ Eigen::VectorXf
     NearNeighborDisMetric::_nncosine_distance(
         const FEATURESS & x, const FEATURESS & y)
 {
-    // *** 修正: 检查 x (历史特征) 是否为空 ***
     if (x.rows() == 0 || y.rows() == 0) {
         // 如果历史库 x 为空, 返回一个 y 那么长的向量, 填充最大余弦距离 (2.0)
         return Eigen::VectorXf::Constant(y.rows(), 2.0f);
     }
-    // ***************************************
     MatrixXf distances = _cosine_distance(x, y);
     VectorXf res = distances.colwise().minCoeff().transpose();
     return res;
@@ -112,12 +110,10 @@ Eigen::VectorXf
     NearNeighborDisMetric::_nneuclidean_distance(
         const FEATURESS & x, const FEATURESS & y)
 {
-    // *** 修正: 检查 x (历史特征) 是否为空 ***
     if (x.rows() == 0 || y.rows() == 0) {
         // 如果历史库 x 为空, 返回一个 y 那么长的向量, 填充最大欧氏距离 (inf)
         return Eigen::VectorXf::Constant(y.rows(), std::numeric_limits<float>::max());
     }
-    // ***************************************
     MatrixXf distances = _pdist(x, y);
     VectorXf res = distances.colwise().maxCoeff().transpose();
     res = res.array().max(VectorXf::Zero(res.rows()).array());

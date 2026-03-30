@@ -19,7 +19,7 @@ void PreprocessNode::execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx)
     // 2. 颜色空间转换 (BGR -> YCrCb)
     cv::cvtColor(fusion_packet.vis_resize, fusion_packet.ycrcb_img, cv::COLOR_BGR2YCrCb);
 
-    // 3. 【关键修复】通道分离：使用 extractChannel 精准抽取
+    // 3.通道分离：使用 extractChannel 精准抽取
     // 索引 0=Y, 1=Cr, 2=Cb
     cv::extractChannel(fusion_packet.ycrcb_img, fusion_packet.vis_y, 0);  
     cv::extractChannel(fusion_packet.ycrcb_img, fusion_packet.vis_cr, 1); 

@@ -8,10 +8,6 @@ void PostprocessNode::execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx
     // 1. 类型转换为业务数据包
     auto &fusion_packet = static_cast<FusionDataPacket&>(packet);
 
-    // ==========================================================
-    // 开始后处理：全程复用 Packet 中预先分配的 cv::Mat 缓存
-    // ==========================================================
-
     // 2. 反归一化 (Float32 -> Uint8，数值乘以 255.0)
     // fused_y_uint8 在 Packet 构造时已分配好 CV_8UC1 的内存，此处直接覆写
     fusion_packet.fused_y_float.convertTo(fusion_packet.fused_y_uint8, CV_8UC1, 255.0);

@@ -41,10 +41,6 @@ void ResultConsumer::consume(std::unique_ptr<GryFlux::DataPacket> packet) {
 void ResultConsumer::processSequentialFrame(TrackDataPacket* p) {
     // 2. 将检测框和特征向量打包成算法需要的 DETECTIONS (std::vector<DETECTION_ROW>)
     DETECTIONS ds_input;
-
-    // 【调试信息 1】：检查输入帧号和 NPU 送来的检测框数量
-    // std::cout << "[DEBUG] Frame ID: " << p->frame_id 
-    //           << " | NPU Detections: " << p->detections.size() << std::endl;
     
     for (size_t i = 0; i < p->detections.size(); ++i) {
         const auto& d = p->detections[i];
@@ -56,20 +52,11 @@ void ResultConsumer::processSequentialFrame(TrackDataPacket* p) {
         FEATURE feat = Eigen::Map<FEATURE>(p->reid_features[i].data());
         
         ds_input.emplace_back(box, d.score, feat);
-        // 【调试信息 2】打印前两个检测框的坐标和置信度，确认坐标反推是否正确
-        // if (i < 2) {
-        //     std::cout << "  -> Det " << i << ": [x:" << d.x1 << ", y:" << d.y1 
-        //               << ", w:" << (d.x2 - d.x1) << ", h:" << (d.y2 - d.y1) 
-        //               << "] score: " << d.score << std::endl;
-        //             }
+
     }
 
     // 3. 调用单参数的 update
     p->active_tracks = tracker_->update(ds_input);
-    // 【调试信息 3】：检查 Tracker 成功输出的确定态(Confirmed)轨迹数量
-    // std::cout << "[DEBUG] Frame ID: " << p->frame_id 
-    //           << " | Active Tracks Output: " << p->active_tracks.size() 
-    //           << "\n----------------------------------------" << std::endl;
 
     // 4. 修正绘图逻辑 (使用 to_tlwh() 获取坐标)
     for (const auto& track : p->active_tracks) {

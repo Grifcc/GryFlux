@@ -6,10 +6,6 @@
 #include <iostream>             // 用于调试输出 (如果需要)
 #include <limits>               // 包含 std::numeric_limits
 #include <cmath>                // 包含 std::isnan, std::isinf
-// 定义 Matrix 类型 (如果 munkres.h 依赖的 matrix.h 没有全局定义)
-// 你需要确保 Matrix 类可用
-// #include "path/to/matrix.h" // 包含 matrix.h
-// 假设 matrix.h 已经被 munkres.h 包含了
 
 // --- 辅助函数：调用 Munkres 求解 ---
 namespace { // 使用匿名命名空间限制作用域

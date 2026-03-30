@@ -31,7 +31,6 @@ void ReidInferNode::execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx) 
             continue;
         }
 
-        // --- 核心 NPU 三部曲 ---
         
         // A. 拷贝：将 CPU 预处理好的 NCHW 数据搬运到 NPU 显存
         reid_ctx.copyToDevice(crop_data.data(), crop_data.size() * sizeof(float));

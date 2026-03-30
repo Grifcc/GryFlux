@@ -22,123 +22,96 @@
 #include <memory>
 #include <string>
 
+void print_help() {
+    std::cout << "Usage: fusion_310p [OPTIONS]\n"
+              << "Options:\n"
+              << "  -h, --help            显示帮助信息\n"
+              << "  -v, --vis   <dir>     可见光图像目录 (必填)\n"
+              << "  -i, --ir    <dir>     红外图像目录 (必填)\n"
+              << "  -s, --save  <dir>     融合结果保存目录 (必填)\n"
+              << "  -m, --model <path>    融合模型 .om 路径 (必填)\n"
+              << "  -t, --threads <num>   工作线程数 (默认: 8)\n"
+              << "  -n, --npu   <num>     NPU 实例数 (默认: 2)\n";
+}
+
 int main(int argc, char **argv) {
-    // ==========================================
-    // 0. 初始化日志记录器
-    // ==========================================
+    std::string visDir = "";
+    std::string irDir = "";
+    std::string saveDir = "";
+    std::string modelPath = "";
+    size_t kThreadPoolSize = 8;
+    size_t kNpuInstances = 2;
+    constexpr size_t kMaxActivePackets = 16; 
+
+    // 解析命令行参数
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "-h" || arg == "--help") {
+            print_help(); return 0;
+        } else if ((arg == "-v" || arg == "--vis") && i + 1 < argc) {
+            visDir = argv[++i];
+        } else if ((arg == "-i" || arg == "--ir") && i + 1 < argc) {
+            irDir = argv[++i];
+        } else if ((arg == "-s" || arg == "--save") && i + 1 < argc) {
+            saveDir = argv[++i];
+        } else if ((arg == "-m" || arg == "--model") && i + 1 < argc) {
+            modelPath = argv[++i];
+        } else if ((arg == "-t" || arg == "--threads") && i + 1 < argc) {
+            kThreadPoolSize = std::stoul(argv[++i]);
+        } else if ((arg == "-n" || arg == "--npu") && i + 1 < argc) {
+            kNpuInstances = std::stoul(argv[++i]);
+        }
+    }
+
+    if (visDir.empty() || irDir.empty() || saveDir.empty() || modelPath.empty()) {
+        std::cerr << "错误: 缺少必要的参数！\n";
+        print_help(); return -1;
+    }
+
     LOG.setLevel(GryFlux::LogLevel::INFO);
     LOG.setOutputType(GryFlux::LogOutputType::CONSOLE);
     LOG.setAppName("ImageFusion310P");
 
-    LOG.info("========================================");
-    LOG.info("  Ascend 310P3 图像融合高并发流水线启动  ");
-    LOG.info("========================================");
+    if (aclInit("") != ACL_ERROR_NONE) return -1;
 
-    // ==========================================
-    // 1. 初始化 Ascend 系统环境
-    // ==========================================
-    const char* aclConfigPath = "";
-    aclError ret = aclInit(aclConfigPath);
-    if (ret != ACL_ERROR_NONE) {
-        LOG.error("ACL 初始化失败, 错误码: %d", ret);
-        return -1;
-    }
-
-    // ==========================================
-    // 2. 参数配置
-    // ==========================================
-    std::string modelPath = "/root/workspace/ma/GryFlux/models/fusionnetv2.om";
-    std::string visDir = "/root/workspace/ma/GryFlux/data/test_imgs/visible";
-    std::string irDir = "/root/workspace/ma/GryFlux/data/test_imgs/infrared";
-    std::string saveDir = "/root/workspace/ma/GryFlux/data/test_imgs/fusion";
-    int deviceId = 0;
-
-    constexpr size_t kThreadPoolSize = 8;     // GryFlux 框架执行任务的 CPU 线程数
-    constexpr size_t kMaxActivePackets = 16;  // 允许在流水线中同时排队流转的最大帧数
-    constexpr size_t kNpuInstances = 2;       // NPU 允许并发执行的模型实例数
-
-    // ==========================================
-    // 3. 构建硬件资源池 (Resource Pool)
-    // ==========================================
     auto resourcePool = std::make_shared<GryFlux::ResourcePool>();
     std::vector<std::shared_ptr<GryFlux::Context>> npuContexts;
     npuContexts.reserve(kNpuInstances);
     
     for (size_t i = 0; i < kNpuInstances; ++i) {
         auto ctx = std::make_shared<InferContext>();
-        if (!ctx->Init(modelPath, deviceId)) {
-            LOG.error("InferContext 初始化失败: 实例 %zu", i);
-            return -1;
+        // 将偶数实例绑到 device 0，奇数实例绑到 device 1，实现双卡并发
+        if (!ctx->Init(modelPath, i % 2)) {
+            LOG.error("InferContext 初始化失败"); return -1;
         }
         npuContexts.push_back(ctx);
     }
-    // 将分配好的 4 个 Ascend 资源注册给框架统一调度
+    
     resourcePool->registerResourceType("image_fusion_npu", std::move(npuContexts));
-    LOG.info("成功注册 %zu 个 NPU 资源实例", kNpuInstances);
 
-    // ==========================================
-    // 4. 构建数据流计算图 (Graph Template)
-    // ==========================================
     auto graphTemplate = GryFlux::GraphTemplate::buildOnce(
         [](GryFlux::TemplateBuilder *builder) {
-            // 第一层：输入预处理节点 (不需要硬件资源申请)
             builder->setInputNode<PreprocessNode>("preprocess");
-            
-            // 第二层：推理节点 (依赖 preprocess 的输出，且必须向 resourcePool 申请 "image_fusion_npu" 资源)
             builder->addTask<InferNode>("infer", "image_fusion_npu", {"preprocess"});
-            
-            // 第三层：输出后处理节点 (依赖 infer 的输出)
             builder->setOutputNode<PostprocessNode>("postprocess", {"infer"});
         }
     );
 
-    // ==========================================
-    // 5. 实例化数据源和消费端
-    // ==========================================
     auto source = std::make_shared<FusionDataSource>(visDir, irDir);
     auto consumer = std::make_shared<FusionDataConsumer>(saveDir);
 
-    // ==========================================
-    // 6. 启动异步并发流水线
-    // ==========================================
-    GryFlux::AsyncPipeline pipeline(
-        source,
-        graphTemplate,
-        resourcePool,
-        consumer,
-        kThreadPoolSize,
-        kMaxActivePackets
-    );
+    GryFlux::AsyncPipeline pipeline(source, graphTemplate, resourcePool, consumer, kThreadPoolSize, kMaxActivePackets);
 
-    // 启用框架自带的 Profiler (如果在 CMake 中开启了宏)
-    if constexpr (GryFlux::Profiling::kBuildProfiling) {
-        pipeline.setProfilingEnabled(true);
-    }
+    if constexpr (GryFlux::Profiling::kBuildProfiling) pipeline.setProfilingEnabled(true);
 
-    LOG.info("开始执行推理...");
-    auto startTime = std::chrono::steady_clock::now();
-    
-    // 这一步会阻塞，直到 Data Source 返回 false，并且所有任务处理落盘完毕
     pipeline.run();
-
-    auto endTime = std::chrono::steady_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-    LOG.info("流水线执行完毕，总耗时: %lld ms", duration.count());
 
     if constexpr (GryFlux::Profiling::kBuildProfiling) {
         pipeline.printProfilingStats();
         pipeline.dumpProfilingTimeline("fusion_timeline.json");
     }
 
-    // ==========================================
-    // 7. 资源清理与退出 (非常重要)
-    // ==========================================
-    // 在调用 aclFinalize 之前，必须先将所有的 Device 内存和模型资源释放！
-    // 因为它们被包装在 resourcePool 里的 std::shared_ptr 中，如果不主动清空，
-    // main 函数结束时 shared_ptr 的析构函数会试图调用 aclrtFree，但那时 ACL 已经 Finalize 了，会导致进程崩溃。
     resourcePool.reset(); 
-
     aclFinalize();
-    LOG.info("ACL 资源安全释放，程序退出。");
     return 0;
 }

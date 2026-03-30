@@ -35,7 +35,4 @@ void FusionDataConsumer::consume(std::unique_ptr<GryFlux::DataPacket> packet) {
     } else {
         std::cerr << "[FusionDataConsumer] 保存失败: " << savePath << std::endl;
     }
-
-    // 函数结束时，形参 `packet` 作为 unique_ptr 会自动析构。
-    // 这时，我们在 Packet 中预分配的所有 cv::Mat 缓存也会随着一同被安全释放，不会导致内存泄漏。
 }

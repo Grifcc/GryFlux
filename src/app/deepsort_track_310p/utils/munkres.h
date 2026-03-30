@@ -1,13 +1,9 @@
-/*
- * Copyright (c) 2007 John Weaver
- * Copyright (c) 2015 Miroslav Krajicek
- * ... (版权和许可信息) ...
- */
+
 
 #if !defined(_MUNKRES_H_)
 #define _MUNKRES_H_
 
-#include "matrix.h" // *** 确保这个文件存在并能被找到 ***
+#include "matrix.h" 
 
 #include <list>
 #include <utility>
@@ -15,9 +11,6 @@
 #include <cmath>
 #include <limits>
 
-
-// *** 从你的 munkres.h 文件复制过来的 XYZMIN 和 XYZMAX 宏定义 ***
-// (或者包含定义它们的头文件, 如果它们来自别处)
 #ifndef XYZMIN
 #define XYZMIN(a,b) (((a)<(b))?(a):(b))
 #endif
@@ -39,7 +32,7 @@ public:
      * 求解后, 矩阵中值为 0 的位置表示最优分配, 其他位置为 -1.
      */
     void solve(Matrix<Data> &m) {
-        // ... (你提供的 munkres.h 中的完整实现) ...
+        
         const size_t rows = m.rows(),
                 columns = m.columns(),
                 size = XYZMAX(rows, columns);
@@ -89,7 +82,7 @@ public:
         delete [] col_mask;
     }
 
-    // ... (replace_infinites, minimize_along_direction 实现) ...
+  
     static void replace_infinites(Matrix<Data> &matrix) {
       const size_t rows = matrix.rows(), columns = matrix.columns();
       double max_val = std::numeric_limits<Data>::lowest(); // Use lowest() for potentially negative numbers
@@ -162,7 +155,7 @@ public:
 
 
 private:
-    // ... (step1 to step5 和其他私有成员及方法的实现) ...
+    
       inline bool find_uncovered_in_matrix(const Data item, size_t &row, size_t &col) const {
         const size_t rows = matrix.rows(), columns = matrix.columns();
         for ( row = 0 ; row < rows ; row++ ) {
@@ -355,8 +348,7 @@ private:
         }
 
         if (!found_uncovered || h == std::numeric_limits<Data>::max()) {
-           // Should not happen if matrix is finite, but handle defensively
-           // Maybe indicate an error or break? For now, go back to step 3 hoping something changed.
+           
            return 3;
         }
 

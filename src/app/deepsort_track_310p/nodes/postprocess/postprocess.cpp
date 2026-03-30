@@ -3,7 +3,6 @@
 #include <iostream>
 #include <cmath>
 #include <algorithm>
-// #include <set> // 不再需要 set，因为我们不需要提取独立的类别了
 
 namespace {
 
@@ -43,7 +42,7 @@ namespace {
         return u <= 0.f ? 0.f : (i / u);
     }
 
-    // 💡 核心修改点 1：去掉了 classIds 和 filterId 参数，彻底变为跨类别 NMS
+    //跨类别 NMS
     int nms_filter(int validCount, std::vector<float> &outputLocations, std::vector<int> &order, float threshold) {
         for (int i = 0; i < validCount; ++i) {
             int n = order[i];
@@ -156,7 +155,7 @@ void PostprocessNode::execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx
     // 根据置信度降序排列
     quick_sort_indice_inverse(objProbs, 0, validCount - 1, indexArray);
 
-    // 💡 核心修改点 2：直接进行全局跨类别 NMS，丢弃按类别循环的逻辑
+    // 进行全局跨类别 NMS，丢弃按类别循环的逻辑
     nms_filter(validCount, filterBoxes, indexArray, nms_thresh_);
 
     // 将经过过滤存活的框还原到原图尺寸，加入 packet

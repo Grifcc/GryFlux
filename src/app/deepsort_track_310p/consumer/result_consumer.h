@@ -28,7 +28,7 @@ private:
     std::unique_ptr<DeepSortTracker> tracker_;
     cv::VideoWriter writer_;
 
-    // --- 【核心】乱序重排缓冲区 ---
+    // --- 乱序重排缓冲区 ---
     int expected_frame_id_ = 0; // 下一帧期望拿到的 ID
     
     // 利用 std::map 的自动排序特性，Key 是 frame_id

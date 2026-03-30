@@ -14,10 +14,10 @@ public:
     {
         if (!cap_.isOpened()) {
             std::cerr << "[ImageDataSource] 错误: 无法打开视频文件: " << video_path << std::endl;
-            setHasMore(false); // 【修改】：告知框架没有数据
+            setHasMore(false); 
         } else {
             std::cout << "[ImageDataSource] 成功打开视频，FPS: " << cap_.get(cv::CAP_PROP_FPS) << std::endl;
-            setHasMore(true);  // 【修改】：告知框架有数据可以读取
+            setHasMore(true); 
             readNextFrame();   // 预读第一帧
         }
     }

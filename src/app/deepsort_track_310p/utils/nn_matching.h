@@ -4,11 +4,6 @@
 #include <map>
 #include <Eigen/Core>
 #include "datatype.h" // 包含 FEATURESS, FEATURE, 等定义
-
-// 确保 common/package.h 已经定义了以下类型:
-// using FEATURESS = Eigen::Matrix<float, Eigen::Dynamic, 512, Eigen::RowMajor>;
-// using FEATURE = Eigen::Matrix<float, 1, 512, Eigen::RowMajor>;
-// 假设 TRACKER_DATA 定义为 std::pair<int, FEATURESS> (用于 partial_fit)
 using TRACKER_DATA = std::pair<int, FEATURESS>;
 // 假设 DYNAMICM 定义为 Eigen::MatrixXf
 using DYNAMICM = Eigen::MatrixXf;

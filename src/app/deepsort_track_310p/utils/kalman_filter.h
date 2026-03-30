@@ -6,17 +6,6 @@
 #include <utility> // for std::pair
 #include "datatype.h"
 
-// 确保 common/package.h 已经定义了以下类型:
-// using KAL_MEAN = Eigen::Matrix<float, 1, 8, Eigen::RowMajor>;
-// using KAL_COVA = Eigen::Matrix<float, 8, 8, Eigen::RowMajor>;
-// using KAL_HMEAN = Eigen::Matrix<float, 1, 4, Eigen::RowMajor>;
-// using KAL_HCOVA = Eigen::Matrix<float, 4, 4, Eigen::RowMajor>;
-// using KAL_DATA = std::pair<KAL_MEAN, KAL_COVA>;
-// using KAL_HDATA = std::pair<KAL_HMEAN, KAL_HCOVA>;
-// using DETECTBOX = Eigen::Matrix<float, 1, 4, Eigen::RowMajor>;
-// using DETECTBOXSS = Eigen::Matrix<float, Eigen::Dynamic, 4, Eigen::RowMajor>;
-
-
 /**
  * @brief 卡尔曼滤波器类，用于 DeepSORT 状态估计.
  * 状态空间: [cx, cy, a, h, vx, vy, va, vh]
