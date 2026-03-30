@@ -64,26 +64,26 @@
 在项目根目录执行：
 
 ```bash
-cmake -S /root/workspace/hry/GryFlux -B /root/workspace/hry/GryFlux/build
-cmake --build /root/workspace/hry/GryFlux/build --target deeplab -j
+cmake -S /path/to/GryFlux -B /path/to/GryFlux/build
+cmake --build /path/to/GryFlux/build --target deeplab -j
 ```
 
 构建成功后，二进制通常位于：
 
 ```bash
-/root/workspace/hry/GryFlux/build/src/app/segmentation_deeplab_ascend/deeplab
+/path/to/GryFlux/build/src/app/segmentation_deeplab_ascend/deeplab
 ```
 
 如果执行了安装步骤：
 
 ```bash
-cmake --install /root/workspace/hry/GryFlux/build
+cmake --install /path/to/GryFlux/build
 ```
 
 则默认会安装到：
 
 ```bash
-/root/workspace/hry/GryFlux/install/bin/deeplab
+/path/to/GryFlux/install/bin/deeplab
 ```
 
 如果你显式设置了 `CMAKE_INSTALL_PREFIX`，则以你设置的前缀为准。
