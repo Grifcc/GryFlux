@@ -6,7 +6,6 @@
 #include <vector>
 #include <tuple>
 
-// 使用静态变量存储提取出的指标
 static std::vector<std::tuple<std::string, double, double, std::string>> s_metrics_log;
 
 ZeroDceResultConsumer::ZeroDceResultConsumer(size_t total_frames) 
@@ -23,7 +22,6 @@ ZeroDceResultConsumer::ZeroDceResultConsumer(size_t total_frames)
 void ZeroDceResultConsumer::consume(std::unique_ptr<GryFlux::DataPacket> packet) {
     auto* dce_packet = dynamic_cast<ZeroDcePacket*>(packet.get());
     
-    // 抄数据
     s_metrics_log.push_back({
         dce_packet->image_name, 
         dce_packet->int8_psnr, 
@@ -34,11 +32,9 @@ void ZeroDceResultConsumer::consume(std::unique_ptr<GryFlux::DataPacket> packet)
     completed_frames_++;
     std::cout << "\r[Consumer] 进度: " << completed_frames_ << " / " << total_frames_ << std::flush;
 
-    // 🌟 终极机制：最后一张图处理完，打表格并解锁主线程
     if (completed_frames_ == total_frames_) {
-        printMetrics(); // 打印漂亮的表格
+        printMetrics(); 
 
-        // 唤醒主线程，允许程序优雅退出
         bool expected = false;
         if (finish_signaled_.compare_exchange_strong(expected, true)) {
             finish_promise_.set_value();
@@ -46,9 +42,7 @@ void ZeroDceResultConsumer::consume(std::unique_ptr<GryFlux::DataPacket> packet)
     }
 }
 
-// ⬇️ 就是这个函数被你不小心删了，现在给它补回来！
 void ZeroDceResultConsumer::printMetrics() {
-    // 防御性编程：防止主线程(main)和 consume 重复调用导致打两遍表格
     if (s_metrics_log.empty()) return; 
 
     std::cout << "\n\n========================================================================\n";
@@ -92,5 +86,5 @@ void ZeroDceResultConsumer::printMetrics() {
     std::cout << "   - 端到端 FPS: " << std::fixed << std::setprecision(4) << fps << " FPS\n";
     std::cout << "========================================================================\n";
 
-    s_metrics_log.clear(); // 打印完毕后清空，完美闭环
+    s_metrics_log.clear(); 
 }

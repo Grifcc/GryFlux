@@ -11,13 +11,10 @@ public:
     explicit ZeroDceResultConsumer(size_t total_frames);
     ~ZeroDceResultConsumer() = default;
 
-    // 获取完成信号
     std::future<void> get_future() { return finish_promise_.get_future(); }
 
-    // 框架回调：当一个 Packet 在末端（PostprocessNode）走完时调用
     void consume(std::unique_ptr<GryFlux::DataPacket> packet) override;
 
-    // 结算打印
     void printMetrics();
 
 private:

@@ -1,10 +1,10 @@
-# 收集 ZeroDCE 模块下所有的源码文件
+# 1. 收集 ZeroDCE 模块下所有的源码文件
 set(ZERODCE_SRC
     ZeroDCE_Atlas.cpp
     source/ZeroDceDataSource.cpp
-    context/AtlasContext.cpp                         # 新增的 Context
-    consumer/ResultConsumer/ZeroDceResultConsumer.cpp # 更新的路径
-    consumer/DiskWriter/AsyncDiskWriter.cpp           # 更新的路径
+    context/AtlasContext.cpp                         
+    consumer/ResultConsumer/ZeroDceResultConsumer.cpp 
+    consumer/DiskWriter/AsyncDiskWriter.cpp         
     nodes/Preprocess/PreprocessNode.cpp
     nodes/Infer/InferNode.cpp
     nodes/Postprocess/PostprocessNode.cpp
@@ -31,14 +31,13 @@ target_include_directories(zero_dce_app PRIVATE
     /usr/local/Ascend/ascend-toolkit/latest/acllib/include
 )
 
-# 🌟 新增：指定库文件搜索路径 (帮链接器找到 ascendcl)
 target_link_directories(zero_dce_app PRIVATE 
     /usr/local/Ascend/ascend-toolkit/latest/lib64
     /usr/local/Ascend/ascend-toolkit/latest/acllib/lib64
     /usr/local/Ascend/ascend-toolkit/latest/x86_64-linux/acllib/lib64
 )
 
-# 5. 链接动态库 (去掉了坑人的 gryflux_core，加上了基础的 pthread)
+# 5. 链接动态库
 target_link_libraries(zero_dce_app PRIVATE 
     ascendcl            
     opencv_core 
