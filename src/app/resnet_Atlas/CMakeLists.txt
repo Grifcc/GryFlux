@@ -1,10 +1,9 @@
-# src/app/resnet_Atlas/CMakeLists.txt
 set(CUR_APP_NAME classification_app_gryflux)
 
 # 1. 收集你写的 ResNet 源文件
 file(GLOB_RECURSE APP_SOURCES "*.cpp")
 
-# 2. 收集 GryFlux 框架底层真正干活的源码 (解决找不到 Framework 的问题)
+# 2. 收集 GryFlux 框架底层真正干活的源码
 file(GLOB_RECURSE GRYFLUX_CORE_SRC 
     "${PROJECT_SOURCE_DIR}/src/framework/*.cpp"
     "${PROJECT_SOURCE_DIR}/src/utils/*.cpp"
@@ -31,12 +30,12 @@ target_include_directories(${CUR_APP_NAME} PRIVATE
     ${OpenCV_INCLUDE_DIRS}
 )
 
-# 8. 指定库文件搜索路径 (解决找不到 ascendcl 的问题)
+# 8. 指定库文件搜索路径 
 target_link_directories(${CUR_APP_NAME} PRIVATE 
     ${ASCEND_TOOLKIT_HOME}/acllib/lib64
 )
 
-# 9. 链接系统库、华为 ACL 和 OpenCV (去掉了会报错的 Framework)
+# 9. 链接系统库、华为 ACL 和 OpenCV
 target_link_libraries(${CUR_APP_NAME}
     PRIVATE
     ascendcl         

@@ -20,7 +20,6 @@ public:
         }
 
         auto packet = std::make_unique<ResNetPacket>();
-        // 新增：每次产生数据包时，给它一个递增的唯一 ID
         packet->packet_id = current_id_++; 
         packet->image_path = dataset_dir_ + "/" + it_->first;
         packet->ground_truth_label = it_->second;
@@ -34,5 +33,5 @@ private:
     std::string dataset_dir_;
     std::map<std::string, int> gt_map_;
     std::map<std::string, int>::const_iterator it_;
-    uint64_t current_id_ = 0; // 新增：用于生成递增的 ID
+    uint64_t current_id_ = 0;
 };

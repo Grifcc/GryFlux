@@ -31,12 +31,11 @@ public:
         if (current == total_images_) {
             bool expected = false;
             if (done_signaled_.compare_exchange_strong(expected, true)) {
-                done_promise_.set_value(); // 🌟 关键！处理完最后一张，发送信号！不再 exit(0)
+                done_promise_.set_value(); 
             }
         }
     }
 
-    // 🌟 对外暴露获取信号的接口
     std::future<void> get_future() { return done_promise_.get_future(); }
 
     void printMetrics() {
@@ -57,6 +56,6 @@ private:
     std::atomic<int> top1_correct_{0};
     std::atomic<int> top5_correct_{0};
     std::chrono::time_point<std::chrono::high_resolution_clock> start_time_;
-    std::promise<void> done_promise_; // 🌟 新增的承诺器
+    std::promise<void> done_promise_; // 
     std::atomic<bool> done_signaled_{false};
 };

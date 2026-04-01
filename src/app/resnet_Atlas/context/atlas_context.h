@@ -4,7 +4,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
-#include <mutex> // 新增：用于多线程互斥锁
+#include <mutex>
 
 #define ACL_CHECK(expr)                                                         \
     do {                                                                        \
@@ -20,7 +20,6 @@ public:
     AtlasContext(int deviceId, const std::string& modelPath) : deviceId_(deviceId) {
         ACL_CHECK(aclrtSetDevice(deviceId_));
         
-        // 显式创建 Context
         ACL_CHECK(aclrtCreateContext(&context_, deviceId_));
         ACL_CHECK(aclrtSetCurrentContext(context_)); 
 
@@ -62,7 +61,6 @@ public:
     int getDeviceId() const { return deviceId_; }
 
     void executeInference(const std::vector<float>& host_input, std::vector<float>& host_output) {
-        // 🌟 加锁：确保多个线程在排队使用 NPU，防止底层驱动崩溃
         std::lock_guard<std::mutex> lock(npu_mutex_);
 
         ACL_CHECK(aclrtSetCurrentContext(context_));
@@ -92,5 +90,5 @@ private:
     aclmdlDataset* outputDataset_ = nullptr;
     aclDataBuffer* outputDataBuffer_ = nullptr;
     
-    std::mutex npu_mutex_; // 🌟 新增的互斥锁
+    std::mutex npu_mutex_;
 };

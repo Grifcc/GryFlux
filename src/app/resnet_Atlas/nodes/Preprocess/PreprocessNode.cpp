@@ -7,7 +7,6 @@
 const int IMG_WIDTH = 224;
 const int IMG_HEIGHT = 224;
 
-// 🌟 换成标准 ImageNet RGB 的均值和方差
 const float MEAN_RGB[3] = {0.485f, 0.456f, 0.406f}; 
 const float STD_RGB[3]  = {0.229f, 0.224f, 0.225f};
 
@@ -22,7 +21,6 @@ void PreprocessNode::execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx)
         return; 
     }
 
-    // 1. 等比例缩放 (Shortest Edge -> 256)
     int h = image.rows;
     int w = image.cols;
     int new_w, new_h;
@@ -36,15 +34,12 @@ void PreprocessNode::execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx)
     cv::Mat resized_image;
     cv::resize(image, resized_image, cv::Size(new_w, new_h));
 
-    // 2. 中心裁剪 (CenterCrop -> 224x224)
     int x = (new_w - IMG_WIDTH) / 2;
     int y = (new_h - IMG_HEIGHT) / 2;
     cv::Rect roi(x, y, IMG_WIDTH, IMG_HEIGHT);
     cv::Mat cropped_image = resized_image(roi).clone();
 
-    // 3. 🌟 核心修改：模型需要 NCHW 格式，且通道顺序为 RGB
     int num_pixels = IMG_WIDTH * IMG_HEIGHT;
-    // 因此第一块连续内存分配给 R，第二块分配给 G，第三块分配给 B
     float* ptr_r = &p.preprocessed_data[0];
     float* ptr_g = &p.preprocessed_data[num_pixels];
     float* ptr_b = &p.preprocessed_data[num_pixels * 2];
@@ -52,13 +47,11 @@ void PreprocessNode::execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx)
     const uint8_t* pixel_ptr = cropped_image.data;
 
     for (int i = 0; i < num_pixels; ++i) {
-        // OpenCV 读进来依然是 BGR 顺序
         float b = static_cast<float>(pixel_ptr[0]) / 255.0f;
         float g = static_cast<float>(pixel_ptr[1]) / 255.0f;
         float r = static_cast<float>(pixel_ptr[2]) / 255.0f;
         pixel_ptr += 3;
         
-        // 分别装入对应的内存，并用 RGB 的均值方差归一化
         *ptr_r++ = (r - MEAN_RGB[0]) / STD_RGB[0];
         *ptr_g++ = (g - MEAN_RGB[1]) / STD_RGB[1];
         *ptr_b++ = (b - MEAN_RGB[2]) / STD_RGB[2];

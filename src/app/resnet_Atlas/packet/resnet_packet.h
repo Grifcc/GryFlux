@@ -4,7 +4,6 @@
 #include <string>
 
 struct ResNetPacket : public GryFlux::DataPacket {
-    // 新增：用于框架追踪的唯一 ID
     uint64_t packet_id = 0; 
 
     std::string image_path;
@@ -19,7 +18,6 @@ struct ResNetPacket : public GryFlux::DataPacket {
           logits(1000) 
     {}
 
-    // 新增：实现基类要求的纯虚函数，返回 ID
     uint64_t getIdx() const override {
         return packet_id;
     }
