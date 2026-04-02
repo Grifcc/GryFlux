@@ -11,6 +11,7 @@ namespace fs = std::experimental::filesystem;
 #error "No filesystem support found"
 #endif
 
+#include <atomic>
 #include <string>
 
 class ImageWriteConsumer : public GryFlux::DataConsumer
@@ -20,9 +21,11 @@ public:
 
     void consume(std::unique_ptr<GryFlux::DataPacket> packet) override;
 
-    size_t getWrittenCount() const { return writtenCount_; }
+    size_t getConsumedCount() const { return consumedCount_.load(std::memory_order_relaxed); }
+    size_t getWrittenCount() const { return writtenCount_.load(std::memory_order_relaxed); }
 
 private:
     fs::path outputDir_;
-    size_t writtenCount_ = 0;
+    std::atomic<size_t> consumedCount_{0};
+    std::atomic<size_t> writtenCount_{0};
 };

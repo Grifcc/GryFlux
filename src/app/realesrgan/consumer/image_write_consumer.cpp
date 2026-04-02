@@ -26,6 +26,8 @@ void ImageWriteConsumer::consume(std::unique_ptr<GryFlux::DataPacket> packet)
         return;
     }
 
+    consumedCount_.fetch_add(1, std::memory_order_relaxed);
+
     auto &p = static_cast<RealesrganPacket &>(*packet);
     if (p.outputBgrU8.empty())
     {
@@ -46,5 +48,5 @@ void ImageWriteConsumer::consume(std::unique_ptr<GryFlux::DataPacket> packet)
         return;
     }
 
-    ++writtenCount_;
+    writtenCount_.fetch_add(1, std::memory_order_relaxed);
 }

@@ -139,14 +139,15 @@ int main(int argc, char **argv)
 
         const auto costMs = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
         const double sec = static_cast<double>(costMs) / 1000.0;
-        const size_t consumed = pipeline.getConsumedCount();
+        const size_t consumed = consumer->getConsumedCount();
+        const size_t written = consumer->getWrittenCount();
         const double throughput = (sec > 0.0) ? (static_cast<double>(consumed) / sec) : 0.0;
 
         LOG.info("========================================");
         LOG.info("Pipeline done in %lld ms", static_cast<long long>(costMs));
         LOG.info("Consumed: %zu, written: %zu, throughput: %.2f packets/s",
                  consumed,
-                 consumer->getWrittenCount(),
+                 written,
                  throughput);
         LOG.info("========================================");
 
