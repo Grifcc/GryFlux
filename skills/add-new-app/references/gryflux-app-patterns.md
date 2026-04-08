@@ -12,6 +12,20 @@
 
 如果仓库未来加入了已提交的部署型 app，再优先参考那些公开目录；在那之前，直接使用下面的推荐骨架。
 
+## 代码质量约束
+
+- 所有新增代码按 Google C++ 风格组织。
+- `main` 函数只保留高层流程：
+  - logger 初始化
+  - 参数解析函数调用
+  - 资源创建
+  - 图构建
+  - pipeline 运行
+  - 汇总输出
+- 帮助信息、参数解析、默认值整理、配置校验必须拆到独立函数或独立配置结构中。
+- 借鉴其他 app 时只保留高质量模式，不要照搬差实现。发现现有实现明显混乱时，按更干净的方式重写。
+- 每个 app 都必须是独立个体，不允许在源码中写死对其他 app 或外部兄弟项目的相对依赖路径。
+
 ## 开始前先确定
 
 1. app 名称
@@ -103,7 +117,7 @@ Input -> Preprocess -> Inference -> Postprocess -> Output
 
 ## 主程序检查项
 
-主程序优先模仿仓库中已提交的 app 主程序；如果当前没有，就按下面这份固定清单组织：
+主程序优先模仿仓库中已提交的高质量 app 主程序；如果当前没有，就按下面这份固定清单组织：
 
 1. 引入框架头文件：
    - `async_pipeline.h`
@@ -118,7 +132,7 @@ Input -> Preprocess -> Inference -> Postprocess -> Output
    - context
    - 需要时引 packet
 3. 设置 logger 默认行为
-4. 解析 CLI 参数，并在参数非法时明确报错
+4. 调用独立的 CLI 参数解析函数，并在参数非法时明确报错
 5. 用 `ResourcePool` 注册资源实例
 6. 构建带稳定节点 ID 的 DAG
 7. 构造 source 和 consumer
@@ -128,7 +142,7 @@ Input -> Preprocess -> Inference -> Postprocess -> Output
 
 ## README 规范
 
-部署型 app 的 `README.md` 至少保留下面六节，顺序也按这个来：
+部署型 app 的 `README.md` 至少保留下面六节。README 规范就在本文件这一节，从这里开始往下看。
 
 ### 1. 概述
 
@@ -299,6 +313,36 @@ cmake --build build-aarch64 --target <app-name> -j$(nproc)
 | `--profile` | `false` | 是否输出 profiling 信息 |
 ```
 
+### 可选：耗时与性能
+
+只有在当前环境可以实际运行 app 并拿到有效统计时，才增加这一节。
+
+如果只是交叉编译、静态交付，或者当前环境缺少板端/NPU/GPU/模型/数据集，README 不强制包含这一节。
+
+可写内容：
+
+- 总耗时的统计口径
+- 吞吐的计算方式
+- 建议关注的关键耗时
+- 测试环境
+
+推荐写法：
+
+```md
+## 耗时与性能
+
+- 总耗时：从 pipeline 启动到全部结果写出完成
+- 吞吐：`processed_count / total_seconds`
+- 建议输出：
+  - 总耗时
+  - 平均每包耗时
+  - 吞吐
+- 测试环境：
+  - 平台
+  - 模型
+  - 输入规模
+```
+
 ## CMake 规则
 
 ### 通用规则
@@ -340,6 +384,7 @@ file(GLOB_RECURSE APP_SOURCES CONFIGURE_DEPENDS
   - 依赖目录可放在 `src/app/<app-name>/3rdparty/`
   - 实际依赖文件默认不提交到 git
   - 用 `.gitignore` 忽略 `3rdparty/` 或其中的大文件/运行库
+  - 不要在代码中写 `../other-project/...` 或 `../other-app/...` 这类跨目录依赖路径
   - 定义根目录 cache 变量
   - 定义 include/lib 路径
   - 用 `if(NOT EXISTS ...) message(FATAL_ERROR ...)` 做显式检查

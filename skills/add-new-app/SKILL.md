@@ -25,7 +25,7 @@ description: 在 GryFlux 仓库中新增一个模型部署 app，包括 `src/app
    - `nodes/`
 5. 在类型齐备后再实现 `<app-name>.cpp`，接好以下内容：
    - logger 初始化
-   - CLI 参数解析
+   - 调用独立的参数解析函数
    - `ResourcePool` 资源注册
    - `GraphTemplate::buildOnce(...)`
    - source / consumer 构造
@@ -78,6 +78,10 @@ cmake --build build --target image-classifier -j$(nproc)
 - 优先复用仓库已有规范，而不是抽象出一层新的通用框架。
 - 如果 app 自带 RKNN/OpenCV/Eigen 等部署依赖，优先采用 app-local 管理方式。
 - 如果 app 的 3rdparty 依赖放在 `src/app/<app-name>/3rdparty/`，默认将其视为本地部署资源：目录保留在 app 下，但不提交到 git；同时补齐 `.gitignore`、路径变量和 README 获取说明。
+- 交付代码中不要出现跨项目或跨 app 的依赖路径，例如 `../EasyStream/3rdparty`、`../app_deeplab/3rdparty`。每个 app 必须是独立个体，自己的依赖只能通过 app 自己的目录或显式 CMake 变量接入。
+- 代码风格按 Google C++ 风格组织。
+- `main` 函数必须保持简洁，让读者能一眼看懂执行流程；帮助信息、参数解析、默认值整理和配置校验都拆到独立函数中。
+- 如果仓库里存在其他 app，只借鉴其中高质量、结构清晰、适合当前任务的部分；不要机械复制明显糟糕、耦合重或质量差的实现。
 - 如果 app 使用 TensorRT，按“共享模型资源 + 独占执行资源”的两层方式接入 `ResourcePool`，不要把 engine、execution context、stream、buffer 全部做成一个全局单例。
 - 做验证时优先构建最小 target，尤其是仓库内不同 app 可能依赖不同工具链或目标机运行时。
 - 交叉编译时默认假设宿主机和目标机架构不同，不要用放宽链接检查的方式“修复”问题。
