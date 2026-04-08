@@ -1,0 +1,72 @@
+# 定义项目名称
+project(yolox_detection_orin)
+
+# GryFlux 要求至少使用 C++17
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# ==========================================
+# 1. 查找依赖包 (OpenCV / CUDA / TensorRT)
+# ==========================================
+find_package(OpenCV REQUIRED)
+find_package(CUDAToolkit REQUIRED)
+
+find_path(TENSORRT_INCLUDE_DIR NvInfer.h
+    PATHS
+        /usr/include
+        /usr/include/x86_64-linux-gnu
+        /usr/include/aarch64-linux-gnu
+        /usr/local/include
+)
+find_library(TENSORRT_LIB nvinfer
+    PATHS
+        /usr/lib
+        /usr/lib/x86_64-linux-gnu
+        /usr/lib/aarch64-linux-gnu
+        /usr/local/lib
+        /usr/local/TensorRT/lib
+)
+
+if(NOT TENSORRT_INCLUDE_DIR OR NOT TENSORRT_LIB)
+    message(FATAL_ERROR "TensorRT not found. Please set TENSORRT_INCLUDE_DIR and TENSORRT_LIB.")
+endif()
+
+# ==========================================
+# 2. 收集源文件并生成可执行文件
+# ==========================================
+# 收集你写的所有的 .cpp 文件
+file(GLOB_RECURSE APP_SOURCES
+    "*.cpp" 
+)
+
+# 【关键修复】必须把 ${SRC_DIR} (框架源码) 也加进来到一起编译
+add_executable(${PROJECT_NAME}
+    ${APP_SOURCES}
+    ${SRC_DIR}
+)
+
+# ==========================================
+# 3. 包含头文件目录
+# ==========================================
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}         # 包含当前目录
+    ${OpenCV_INCLUDE_DIRS}              # OpenCV 头文件
+    ${TENSORRT_INCLUDE_DIR}
+    ${CUDAToolkit_INCLUDE_DIRS}
+)
+
+# ==========================================
+# 4. 链接库
+# ==========================================
+target_link_libraries(${PROJECT_NAME} PRIVATE
+    ${dynamic_libs}
+    ${OpenCV_LIBS}
+    CUDA::cudart
+    ${TENSORRT_LIB}
+)
+
+# ==========================================
+# 5. 安装规则 (适配根目录的 build.sh)
+# ==========================================
+install(TARGETS ${PROJECT_NAME}
+        RUNTIME DESTINATION bin)

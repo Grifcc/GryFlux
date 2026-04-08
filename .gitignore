@@ -154,4 +154,5 @@ models/
 outputs/
 
 *.mp4
+.codex
 
