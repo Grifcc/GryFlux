@@ -13,11 +13,13 @@ description: 在 GryFlux 仓库中新增一个模型部署 app，包括 `src/app
 
 1. 开始前先阅读 [references/gryflux-app-patterns.md](./references/gryflux-app-patterns.md)。
 2. 先判断仓库中是否存在已提交的相似 app：
-   - 如果有，优先在其目录结构和主程序接线方式上做同构扩展
+   - `src/app/example` 是最高优先级参考案例，优先学习它的结构清晰度、命名、packet 预分配思路和整体工程质量
+   - 如果有其他已提交 app，只把它们当作功能补充参考，不要让它们覆盖 `example` 的设计基线
    - 如果没有，就直接使用参考文档中的推荐骨架
-   - `src/app/example` 只适合框架演示，不适合作为部署型 app 模板
+   - `src/app/example` 虽然是框架示例，但它是当前最可靠的质量基线；部署型 app 可以在此基础上补充 source/consumer/context/dependency 管理
 3. 在 `src/app/<app-name>/` 下创建新目录，只创建当前 app 真正需要的子目录。
 4. 先实现 app 自己的类型，再写主程序：
+   - `3rdparty/`
    - `packet/`
    - `context/`
    - `source/`
@@ -50,6 +52,7 @@ description: 在 GryFlux 仓库中新增一个模型部署 app，包括 `src/app
    - `image-classifier.cpp`
    - `CMakeLists.txt`
    - `README.md`
+   - `3rdparty/`
    - `packet/classifier_packet.h`
    - `context/npu_context.h/.cpp`
    - `source/image_dir_source.h/.cpp`
@@ -64,7 +67,19 @@ description: 在 GryFlux 仓库中新增一个模型部署 app，包括 `src/app
    - `GraphTemplate::buildOnce(...)` 构建 `input -> preprocess -> inference -> postprocess -> output`
    - source/consumer 创建
    - `AsyncPipeline` 运行
-4. 为该 app 单独添加 target，并优先执行：
+4. `3rdparty/` 至少给出清晰的目录入口，例如：
+
+```text
+src/app/image-classifier/3rdparty/
+├── opencv/
+├── librknn_api/
+├── Eigen/
+└── models/
+```
+
+其中部分子目录可以是指向外部位置的符号链接，但 `src/app/image-classifier/3rdparty/` 这个入口目录必须存在于 app 自己目录下。
+
+5. 为该 app 单独添加 target，并优先执行：
 
 ```bash
 cmake --build build --target image-classifier -j$(nproc)
@@ -76,12 +91,14 @@ cmake --build build --target image-classifier -j$(nproc)
 
 - 除非用户明确要求，否则保持 GryFlux 现有框架接口不变。
 - 优先复用仓库已有规范，而不是抽象出一层新的通用框架。
-- 如果 app 自带 RKNN/OpenCV/Eigen 等部署依赖，优先采用 app-local 管理方式。
-- 如果 app 的 3rdparty 依赖放在 `src/app/<app-name>/3rdparty/`，默认将其视为本地部署资源：目录保留在 app 下，但不提交到 git；同时补齐 `.gitignore`、路径变量和 README 获取说明。
+- 每个 deployment app 都应拥有自己的 `src/app/<app-name>/3rdparty/`，依赖只从该 app 目录内接入，不依赖其他 app 的依赖目录，也不依赖仓库外的共享 3rdparty 目录。
+- `src/app/<app-name>/3rdparty/` 视为本地部署资源：目录保留在 app 下，但默认不提交到 git；同时补齐 `.gitignore`、路径变量和 README 获取说明。
 - 交付代码中不要出现跨项目或跨 app 的依赖路径，例如 `../EasyStream/3rdparty`、`../app_deeplab/3rdparty`。每个 app 必须是独立个体，自己的依赖只能通过 app 自己的目录或显式 CMake 变量接入。
 - 代码风格按 Google C++ 风格组织。
 - `main` 函数必须保持简洁，让读者能一眼看懂执行流程；帮助信息、参数解析、默认值整理和配置校验都拆到独立函数中。
+- `src/app/example` 是默认的优秀参考案例，优先学习它；其他 app 只能作为次级参考，用于补充特定功能，不得默认视为同等质量基线。
 - 如果仓库里存在其他 app，只借鉴其中高质量、结构清晰、适合当前任务的部分；不要机械复制明显糟糕、耦合重或质量差的实现。
+- `packet` 在构造或初始化阶段应尽量预分配好运行期需要的内存和容器容量，避免在热路径中频繁 `new`、`malloc`、`resize`、`push_back` 触发扩容。
 - 如果 app 使用 TensorRT，按“共享模型资源 + 独占执行资源”的两层方式接入 `ResourcePool`，不要把 engine、execution context、stream、buffer 全部做成一个全局单例。
 - 做验证时优先构建最小 target，尤其是仓库内不同 app 可能依赖不同工具链或目标机运行时。
 - 交叉编译时默认假设宿主机和目标机架构不同，不要用放宽链接检查的方式“修复”问题。

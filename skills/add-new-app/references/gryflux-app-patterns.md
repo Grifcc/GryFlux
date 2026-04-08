@@ -8,9 +8,11 @@
 
 - 最小框架示例
 - 适合理解 `GraphTemplate`、`ResourcePool`、`AsyncPipeline`
-- 不适合作为 RKNN/OpenCV 部署型 app 模板
+- 是当前仓库里默认的优秀参考案例
+- 应优先学习它的代码组织、命名、`packet` 预分配思路和主流程清晰度
+- 即使部署型 app 需要额外的 source/consumer/context/3rdparty 管理，也应先以它作为质量基线
 
-如果仓库未来加入了已提交的部署型 app，再优先参考那些公开目录；在那之前，直接使用下面的推荐骨架。
+其他已提交 app 只作为补充参考，不应默认高于 `src/app/example` 的优先级；如果两者冲突，以 `src/app/example` 的清晰度、简洁性和工程规范为准。
 
 ## 代码质量约束
 
@@ -23,8 +25,10 @@
   - pipeline 运行
   - 汇总输出
 - 帮助信息、参数解析、默认值整理、配置校验必须拆到独立函数或独立配置结构中。
+- 优先向 `src/app/example` 学习，而不是优先模仿其他人新增的 app。
 - 借鉴其他 app 时只保留高质量模式，不要照搬差实现。发现现有实现明显混乱时，按更干净的方式重写。
 - 每个 app 都必须是独立个体，不允许在源码中写死对其他 app 或外部兄弟项目的相对依赖路径。
+- `packet` 默认按高性能思路设计：在构造或初始化阶段预分配运行期要用到的主要 buffer、vector 和中间结果，尽量避免运行时动态分配。
 
 ## 开始前先确定
 
@@ -43,9 +47,7 @@
    - 纯 CPU
    - NPU
    - NPU 加额外状态资源
-5. 第三方依赖模式
-   - app-local：依赖随 app 目录一起管理
-   - external-shared：依赖位于仓库外部或统一共享目录
+5. 该 app 的 `3rdparty/` 目录结构
 6. 是否要加入 `src/app/CMakeLists.txt` 参与默认构建
 
 ## 推荐目录骨架
@@ -57,6 +59,7 @@ src/app/<app-name>/
 ├── CMakeLists.txt
 ├── README.md
 ├── <app-name>.cpp
+├── 3rdparty/
 ├── consumer/
 ├── context/
 ├── nodes/
@@ -70,10 +73,32 @@ src/app/<app-name>/
 - `3rdparty/`：app 自带部署依赖
 - 业务算法目录，例如 `postprocess_impl/`、`tracking_core/`、`custom_ops/`
 
-如果 `3rdparty/` 放在 app 目录里，推荐语义是：
+## Packet 设计要求
+
+- `packet` 是运行期热路径对象，默认按“少分配、少扩容、少拷贝”设计。
+- 在 `packet` 构造函数或显式初始化函数中，尽量完成这些预分配：
+  - 输入 tensor buffer
+  - 预处理结果
+  - 推理输出 buffer
+  - 后处理中间结果
+  - 结果容器容量
+- 对 `std::vector` 优先使用：
+  - 构造时指定大小
+  - `resize()` 到固定工作尺寸
+  - `reserve()` 预留上限容量
+- 避免在节点执行热路径里反复：
+  - `push_back()` 触发扩容
+  - 临时创建大对象
+  - 重新分配中间 buffer
+- 如果某些输出尺寸天然动态变化，至少要按已知上限 `reserve()`，不要让容量增长发生在主处理循环里。
+
+`3rdparty/` 是每个 deployment app 的默认组成部分，推荐语义是：
 
 - 目录位置固定在 `src/app/<app-name>/3rdparty/`
-- 作为本地部署依赖存在，便于 app 自己管理 include/lib 路径
+- 作为该 app 的本地部署依赖存在，便于 app 自己管理 include/lib 路径
+- 每个 app 只维护自己的依赖，不与其他 app 共用依赖目录
+- `3rdparty/` 入口目录必须真实存在于 app 目录下
+- `3rdparty/` 内部的部分子目录可以是指向外部依赖位置的符号链接，但对 app 来说统一从 `src/app/<app-name>/3rdparty/` 进入
 - 默认不提交到 git
 - 需要在 app 目录或仓库根目录补 `.gitignore`
 - 需要在 `README.md` 中说明依赖应如何准备
@@ -87,6 +112,11 @@ src/app/image-classifier/
 ├── CMakeLists.txt
 ├── README.md
 ├── image-classifier.cpp
+├── 3rdparty/
+│   ├── opencv/
+│   ├── librknn_api/
+│   ├── Eigen/
+│   └── models/
 ├── consumer/
 │   ├── result_writer.h
 │   └── result_writer.cpp
@@ -115,9 +145,18 @@ Input -> Preprocess -> Inference -> Postprocess -> Output
 
 只有在业务确实需要时，再扩成多分支或多资源流水线。
 
+上面这个示例里，`3rdparty/` 是 app 的固定入口。允许的做法是：
+
+- `3rdparty/opencv/` 为真实目录
+- `3rdparty/librknn_api/` 为真实目录
+- `3rdparty/Eigen/` 为符号链接
+- `3rdparty/models/` 为符号链接
+
+但不允许省略整个 `3rdparty/` 入口目录，也不允许在代码里直接依赖 `../somewhere/...` 这类路径。
+
 ## 主程序检查项
 
-主程序优先模仿仓库中已提交的高质量 app 主程序；如果当前没有，就按下面这份固定清单组织：
+主程序优先模仿 `src/app/example` 的清晰结构；其他 app 只在功能层面提供补充参考。如果当前没有更多高质量公开案例，就按下面这份固定清单组织：
 
 1. 引入框架头文件：
    - `async_pipeline.h`
@@ -170,7 +209,7 @@ Input -> Preprocess -> Inference -> Postprocess -> Output
 必须说明：
 
 - `src/app/<app-name>/` 下关键目录各自做什么
-- `3rdparty/` 只是本地部署依赖，不进 git
+- `3rdparty/` 是该 app 自己的本地部署依赖，不进 git
 
 推荐写法：
 
@@ -182,7 +221,7 @@ Input -> Preprocess -> Inference -> Postprocess -> Output
 - `consumer/`：输出结果写出
 - `packet/`：流水线数据包定义
 - `nodes/`：图节点实现
-- `3rdparty/`：本地部署依赖目录，仅用于本地构建和运行，不提交到 git
+- `3rdparty/`：该 app 自己的本地部署依赖目录，仅用于本地构建和运行，不提交到 git
 ```
 
 ### 3. 依赖准备
@@ -206,14 +245,21 @@ Input -> Preprocess -> Inference -> Postprocess -> Output
 - Eigen
 - 模型文件
 
-如果采用 app-local 依赖，目录期望为：
+该 app 的 `3rdparty/` 目录期望为：
 
 ```text
 src/app/<app-name>/3rdparty/
 ├── opencv/
 ├── librknn_api/
-└── Eigen/
+├── Eigen/
+└── models/
 ```
+
+其中：
+
+- `opencv/`、`librknn_api/`、`Eigen/`、`models/` 可以是实际目录
+- 其中部分目录也可以是外部路径的符号链接
+- 但 app 的 CMake 和代码只能从 `src/app/<app-name>/3rdparty/` 往下解析
 
 模型文件：
 
@@ -380,17 +426,16 @@ file(GLOB_RECURSE APP_SOURCES CONFIGURE_DEPENDS
 
 ### 第三方依赖
 
-- 如果 app 自带部署依赖，采用 app-local 依赖管理方式：
-  - 依赖目录可放在 `src/app/<app-name>/3rdparty/`
+- 每个 deployment app 都使用自己的 `src/app/<app-name>/3rdparty/`
   - 实际依赖文件默认不提交到 git
   - 用 `.gitignore` 忽略 `3rdparty/` 或其中的大文件/运行库
   - 不要在代码中写 `../other-project/...` 或 `../other-app/...` 这类跨目录依赖路径
-  - 定义根目录 cache 变量
-  - 定义 include/lib 路径
+  - 定义该 app 自己的根目录 cache 变量
+  - include/lib 路径只从该 app 的 `3rdparty/` 推导
+  - `3rdparty/` 的子目录允许使用符号链接，但对 app 暴露的入口必须保持统一
   - 用 `if(NOT EXISTS ...) message(FATAL_ERROR ...)` 做显式检查
   - 把运行时 `.so` 安装到 `install/lib`
   - 在 `README.md` 中写清楚依赖来源、目录结构和准备步骤
-- 如果 app 依赖外部统一目录，显式暴露依赖根目录变量，不要把绝对路径写死在源码里
 - 如果依赖是板端专用 `aarch64` 库，不要期待宿主 `x86_64` 的全量构建一定能成功
 
 ## TensorRT 资源管理
