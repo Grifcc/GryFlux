@@ -1,0 +1,4 @@
+interface:
+  display_name: "新增模型 App"
+  short_description: "为 GryFlux 新增模型部署 app 的脚手架与接线流程"
+  default_prompt: "使用 $add-new-app 在这个 GryFlux 仓库里新增一个模型部署 app。"
