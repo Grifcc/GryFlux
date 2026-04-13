@@ -1,1 +1,7 @@
 add_subdirectory(example)
+add_subdirectory(yolox_detection_310p)
+add_subdirectory(deepsort_track_310p)
+add_subdirectory(image_fusion_310p)
+# add_subdirectory(yolox_detection_orin)
+# add_subdirectory(deepsort_track_orin)
+# add_subdirectory(image_fusion_orin)
