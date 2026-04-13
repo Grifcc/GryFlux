@@ -1,56 +1,77 @@
 #pragma once
 
 #include "framework/context.h"
+
 #include <NvInfer.h>
 #include <cuda_runtime.h>
+
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
 
+struct FusionModelInfo {
+    int model_width = 0;
+    int model_height = 0;
+    size_t vis_input_elements = 0;
+    size_t ir_input_elements = 0;
+    size_t output_elements = 0;
+};
+
+struct FusionInferResourceBundle {
+    FusionModelInfo model_info;
+    std::vector<std::shared_ptr<GryFlux::Context>> contexts;
+};
+
+class SharedFusionModel;
+
 class InferContext : public GryFlux::Context {
 public:
-    struct TensorBinding {
-        int bindingIndex = -1;
+    struct TensorBuffer {
+        int binding_index = -1;
         std::string name;
-        nvinfer1::DataType dataType = nvinfer1::DataType::kFLOAT;
-        size_t byteSize = 0;
-        size_t elementCount = 0;
-        void* devicePtr = nullptr;
-        std::vector<std::uint8_t> hostBuffer;
+        nvinfer1::DataType data_type = nvinfer1::DataType::kFLOAT;
+        size_t byte_size = 0;
+        size_t element_count = 0;
+        void* device_ptr = nullptr;
+        std::vector<std::uint8_t> host_buffer;
     };
 
-    InferContext();
+    InferContext(
+        std::shared_ptr<SharedFusionModel> shared_model,
+        int device_id);
     ~InferContext() override;
 
-    bool Init(const std::string& modelPath, int deviceId);
-    void Destroy();
     void bindCurrentThread();
 
-    size_t GetInputElementCount(size_t index) const { return inputBindings_.at(index).elementCount; }
-    size_t GetOutputElementCount() const { return outputBinding_.elementCount; }
-    void copyInputToDevice(size_t index, const float* hostData, size_t elementCount);
+    size_t GetInputElementCount(size_t index) const;
+    size_t GetOutputElementCount() const;
+
+    void copyInputToDevice(size_t index, const float* host_data, size_t element_count);
     void execute();
-    void copyOutputToHost(float* hostData, size_t elementCount);
+    void copyOutputToHost(float* host_data, size_t element_count);
 
 private:
-    void loadEngine(const std::string& modelPath);
-    bool allocateBuffers();
-    void logBindings() const;
+    void createExecutionContext();
+    void allocateBuffers();
+    void releaseBuffers();
 
-    template <typename T>
-    struct TrtDeleter {
-        void operator()(T* ptr) const;
-    };
-
-    int32_t deviceId_;
+    std::shared_ptr<SharedFusionModel> shared_model_;
+    int device_id_ = 0;
     cudaStream_t stream_ = nullptr;
 
-    std::unique_ptr<nvinfer1::IRuntime, TrtDeleter<nvinfer1::IRuntime>> runtime_;
-    std::unique_ptr<nvinfer1::ICudaEngine, TrtDeleter<nvinfer1::ICudaEngine>> engine_;
-    std::unique_ptr<nvinfer1::IExecutionContext, TrtDeleter<nvinfer1::IExecutionContext>> context_;
+    class ExecutionContextHandle;
+    std::unique_ptr<ExecutionContextHandle> execution_context_;
 
+    std::vector<TensorBuffer> input_buffers_;
+    TensorBuffer output_buffer_;
     std::vector<void*> bindings_;
-    std::vector<TensorBinding> inputBindings_;
-    TensorBinding outputBinding_;
 };
+
+FusionInferResourceBundle CreateFusionInferResourceBundle(
+    const std::string& engine_path,
+    int device_id,
+    size_t instance_count,
+    int fallback_width,
+    int fallback_height);

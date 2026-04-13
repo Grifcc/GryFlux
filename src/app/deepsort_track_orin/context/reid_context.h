@@ -1,38 +1,36 @@
 #pragma once
 
 #include "framework/context.h"
-#include <NvInfer.h>
-#include <cuda_runtime.h>
+
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <vector>
 
 class ReidContext : public GryFlux::Context {
 public:
-    ReidContext(const std::string& engine_path, int device_id = 0);
+    ReidContext(
+        std::shared_ptr<class SharedReidModel> shared_model,
+        int device_id = 0);
     ~ReidContext() override;
 
     void copyToDevice(const void* data, size_t size);
     void execute();
-    std::vector<float> copyToHost(int feature_dim = 512);
+    void copyToHost(float* output_data, size_t element_count);
     void bindCurrentThread();
+    size_t getInputBufferSize() const { return input_size_; }
+    size_t getOutputElementCount() const { return output_size_ / sizeof(float); }
 
 private:
-    void loadEngine(const std::string& engine_path);
+    void createExecutionContext();
     void allocateBuffers();
     void releaseBuffers();
 
-    template <typename T>
-    struct TrtDeleter {
-        void operator()(T* ptr) const;
-    };
-
+    std::shared_ptr<SharedReidModel> shared_model_;
     int device_id_;
-    cudaStream_t stream_ = nullptr;
-
-    std::unique_ptr<nvinfer1::IRuntime, TrtDeleter<nvinfer1::IRuntime>> runtime_;
-    std::unique_ptr<nvinfer1::ICudaEngine, TrtDeleter<nvinfer1::ICudaEngine>> engine_;
-    std::unique_ptr<nvinfer1::IExecutionContext, TrtDeleter<nvinfer1::IExecutionContext>> context_;
+    void* stream_ = nullptr;
+    class ExecutionContextHandle;
+    std::unique_ptr<ExecutionContextHandle> execution_context_;
 
     std::vector<void*> bindings_;
     int input_binding_index_ = -1;
@@ -44,3 +42,8 @@ private:
     size_t input_size_;
     size_t output_size_;
 };
+
+std::vector<std::shared_ptr<GryFlux::Context>> CreateReidInferContexts(
+    const std::string& engine_path,
+    int device_id,
+    size_t instance_count);

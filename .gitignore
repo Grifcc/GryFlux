@@ -149,6 +149,11 @@ $RECYCLE.BIN/
 
 data/
 3rdparty/
+!src/app/*/3rdparty/
+!src/app/*/3rdparty/.gitignore
+!src/app/*/3rdparty/README.md
+!src/app/*/3rdparty/*/
+!src/app/*/3rdparty/*/.gitkeep
 install/
 models/
 outputs/

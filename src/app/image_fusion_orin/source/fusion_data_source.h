@@ -1,17 +1,33 @@
 #pragma once
+
 #include "framework/data_source.h"
+
+#include <cstdint>
 #include <string>
-#include <filesystem>
+#include <vector>
 
 class FusionDataSource : public GryFlux::DataSource {
 public:
-    FusionDataSource(const std::string& visDir, const std::string& irDir);
+    FusionDataSource(
+        const std::string& vis_dir,
+        const std::string& ir_dir,
+        int model_width,
+        int model_height);
     ~FusionDataSource() override = default;
+
     std::unique_ptr<GryFlux::DataPacket> produce() override;
 
 private:
-    std::string irDir_;
-    std::filesystem::directory_iterator dirIter_;
-    std::filesystem::directory_iterator endIter_;
-    uint64_t current_idx_ = 0; // 添加计数器
+    struct FramePair {
+        std::string filename;
+        std::string vis_path;
+        std::string ir_path;
+    };
+
+    static bool IsSupportedImageFile(const std::string& extension);
+
+    std::vector<FramePair> frame_pairs_;
+    size_t next_index_ = 0;
+    int model_width_ = 0;
+    int model_height_ = 0;
 };

@@ -1,81 +1,87 @@
-# 定义项目名称
-project(image_fusion_orin)
+set(APP_NAME image_fusion_orin)
+set(APP_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+set(APP_3RDPARTY_DIR ${APP_ROOT_DIR}/3rdparty)
 
-# GryFlux 要求至少使用 C++17
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(IMAGE_FUSION_ORIN_OPENCV_ROOT
+    "${APP_3RDPARTY_DIR}/opencv"
+    CACHE PATH "Root directory or config directory for app-local OpenCV")
+set(IMAGE_FUSION_ORIN_CUDA_ROOT
+    "${APP_3RDPARTY_DIR}/cuda"
+    CACHE PATH "CUDA toolkit root for image_fusion_orin")
+set(IMAGE_FUSION_ORIN_TENSORRT_ROOT
+    "${APP_3RDPARTY_DIR}/TensorRT"
+    CACHE PATH "TensorRT root for image_fusion_orin")
 
-# ==========================================
-# 1. 查找依赖包 (OpenCV / CUDA / TensorRT)
-# ==========================================
-# 查找 OpenCV
-find_package(OpenCV REQUIRED)
+find_package(OpenCV CONFIG REQUIRED
+    PATHS
+        ${IMAGE_FUSION_ORIN_OPENCV_ROOT}
+        ${IMAGE_FUSION_ORIN_OPENCV_ROOT}/lib/cmake/opencv4
+        ${IMAGE_FUSION_ORIN_OPENCV_ROOT}/lib64/cmake/opencv4
+        ${IMAGE_FUSION_ORIN_OPENCV_ROOT}/lib/x86_64-linux-gnu/cmake/opencv4
+        ${IMAGE_FUSION_ORIN_OPENCV_ROOT}/lib/aarch64-linux-gnu/cmake/opencv4
+    NO_DEFAULT_PATH
+)
+
+set(CUDAToolkit_ROOT ${IMAGE_FUSION_ORIN_CUDA_ROOT})
 find_package(CUDAToolkit REQUIRED)
 
 find_path(TENSORRT_INCLUDE_DIR NvInfer.h
-    PATHS
-        /usr/include
-        /usr/include/x86_64-linux-gnu
-        /usr/include/aarch64-linux-gnu
-        /usr/local/include
+    HINTS
+        ${IMAGE_FUSION_ORIN_TENSORRT_ROOT}/include
+        ${IMAGE_FUSION_ORIN_TENSORRT_ROOT}/include/x86_64-linux-gnu
+        ${IMAGE_FUSION_ORIN_TENSORRT_ROOT}/include/aarch64-linux-gnu
+        ${IMAGE_FUSION_ORIN_TENSORRT_ROOT}/targets/x86_64-linux-gnu/include
+        ${IMAGE_FUSION_ORIN_TENSORRT_ROOT}/targets/aarch64-linux-gnu/include
+    NO_DEFAULT_PATH
 )
+
 find_library(TENSORRT_LIB nvinfer
-    PATHS
-        /usr/lib
-        /usr/lib/x86_64-linux-gnu
-        /usr/lib/aarch64-linux-gnu
-        /usr/local/lib
-        /usr/local/TensorRT/lib
+    HINTS
+        ${IMAGE_FUSION_ORIN_TENSORRT_ROOT}/lib
+        ${IMAGE_FUSION_ORIN_TENSORRT_ROOT}/lib64
+        ${IMAGE_FUSION_ORIN_TENSORRT_ROOT}/lib/x86_64-linux-gnu
+        ${IMAGE_FUSION_ORIN_TENSORRT_ROOT}/lib/aarch64-linux-gnu
+        ${IMAGE_FUSION_ORIN_TENSORRT_ROOT}/targets/x86_64-linux-gnu/lib
+        ${IMAGE_FUSION_ORIN_TENSORRT_ROOT}/targets/aarch64-linux-gnu/lib
+    NO_DEFAULT_PATH
 )
 
 if(NOT TENSORRT_INCLUDE_DIR OR NOT TENSORRT_LIB)
-    message(FATAL_ERROR "TensorRT not found. Please set TENSORRT_INCLUDE_DIR and TENSORRT_LIB.")
+    message(FATAL_ERROR
+        "TensorRT was not found for image_fusion_orin. Populate "
+        "src/app/image_fusion_orin/3rdparty/TensorRT or pass "
+        "-DIMAGE_FUSION_ORIN_TENSORRT_ROOT=<TensorRT root>.")
 endif()
 
-# ==========================================
-# 2. 收集源文件并生成可执行文件
-# ==========================================
-# 收集当前应用目录下的所有 .cpp 文件 (包含 source, nodes, context 等)
-file(GLOB_RECURSE APP_SOURCES
-    "*.cpp" 
+set(APP_SOURCES
+    image_fusion_orin.cpp
+    consumer/result_consumer.cpp
+    context/infercontext.cpp
+    source/fusion_data_source.cpp
+    nodes/Input/InputNode.cpp
+    nodes/Preprocess/PreprocessNode.cpp
+    nodes/Inference/InferenceNode.cpp
+    nodes/Postprocess/PostprocessNode.cpp
+    nodes/Output/OutputNode.cpp
 )
 
-# 这里的 ${SRC_DIR} 是在根目录 CMakeLists.txt 中定义的 GryFlux 框架源码路径
-# 将框架源码和应用源码一起编译成可执行程序
-add_executable(${PROJECT_NAME}
+add_executable(${APP_NAME}
     ${APP_SOURCES}
     ${SRC_DIR}
 )
 
-# ==========================================
-# 3. 包含头文件目录
-# ==========================================
-target_include_directories(${PROJECT_NAME} PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}         # 包含当前目录以支持相对路径引用
-    ${OpenCV_INCLUDE_DIRS}              # OpenCV 头文件
+target_include_directories(${APP_NAME} PRIVATE
+    ${APP_ROOT_DIR}
+    ${OpenCV_INCLUDE_DIRS}
     ${TENSORRT_INCLUDE_DIR}
     ${CUDAToolkit_INCLUDE_DIRS}
-    ${INC_DIR}                          # GryFlux 框架头文件目录 (假设根目录已定义 INC_DIR)
 )
 
-# ==========================================
-# 4. 链接库
-# ==========================================
-target_link_libraries(${PROJECT_NAME}
-    PRIVATE
-    ${dynamic_libs}                     # 基础动态库
-    ${OpenCV_LIBS}                      # OpenCV 库
+target_link_libraries(${APP_NAME} PRIVATE
+    ${dynamic_libs}
+    ${OpenCV_LIBS}
     CUDA::cudart
     ${TENSORRT_LIB}
-    stdc++fs                            # 用于 std::filesystem 支持
 )
 
-# 如果启用了性能分析宏，则添加定义
-if(GRYFLUX_BUILD_PROFILING)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE GRYFLUX_BUILD_PROFILING=1)
-endif()
-
-# ==========================================
-# 5. 安装配置 (执行 make install 时拷贝到 bin 目录)
-# ==========================================
-install(TARGETS ${PROJECT_NAME} DESTINATION bin)
+install(TARGETS ${APP_NAME} DESTINATION bin)

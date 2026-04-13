@@ -1,60 +1,108 @@
-#include "fusion_data_source.h"
+#include "source/fusion_data_source.h"
+
 #include "packet/fusion_data_packet.h"
+#include "utils/logger.h"
+
 #include <opencv2/opencv.hpp>
-#include <iostream>
+
+#include <algorithm>
+#include <cctype>
+#include <filesystem>
+#include <stdexcept>
+#include <utility>
 
 namespace fs = std::filesystem;
 
-FusionDataSource::FusionDataSource(const std::string& visDir, const std::string& irDir)
-    : irDir_(irDir) {
-    // 检查目录是否存在并初始化迭代器
-    if (fs::exists(visDir)) {
-        dirIter_ = fs::directory_iterator(visDir);
-    } else {
-        std::cerr << "[FusionDataSource] 错误: Visible 目录不存在: " << visDir << std::endl;
-        dirIter_ = endIter_; 
-        setHasMore(false); // 直接停止生产
+FusionDataSource::FusionDataSource(
+    const std::string& vis_dir,
+    const std::string& ir_dir,
+    int model_width,
+    int model_height)
+    : model_width_(model_width),
+      model_height_(model_height) {
+    if (!fs::exists(vis_dir) || !fs::is_directory(vis_dir)) {
+        throw std::runtime_error("Visible image directory does not exist: " + vis_dir);
     }
+    if (!fs::exists(ir_dir) || !fs::is_directory(ir_dir)) {
+        throw std::runtime_error("Infrared image directory does not exist: " + ir_dir);
+    }
+
+    for (const auto& entry : fs::directory_iterator(vis_dir)) {
+        if (!entry.is_regular_file()) {
+            continue;
+        }
+
+        const std::string extension = entry.path().extension().string();
+        if (!IsSupportedImageFile(extension)) {
+            continue;
+        }
+
+        const fs::path ir_path = fs::path(ir_dir) / entry.path().filename();
+        if (!fs::exists(ir_path) || !fs::is_regular_file(ir_path)) {
+            LOG.warning(
+                "[FusionDataSource] Skip %s because paired IR image is missing",
+                entry.path().filename().string().c_str());
+            continue;
+        }
+
+        frame_pairs_.push_back(
+            FramePair{
+                entry.path().filename().string(),
+                entry.path().string(),
+                ir_path.string()});
+    }
+
+    std::sort(
+        frame_pairs_.begin(),
+        frame_pairs_.end(),
+        [](const FramePair& lhs, const FramePair& rhs) {
+            return lhs.filename < rhs.filename;
+        });
+
+    setHasMore(!frame_pairs_.empty());
+    LOG.info("[FusionDataSource] Found %zu paired images", frame_pairs_.size());
 }
 
 std::unique_ptr<GryFlux::DataPacket> FusionDataSource::produce() {
-    // 使用 while 循环是为了跳过读取失败的图片，直到找到一张合法的或者遍历完目录
-    while (dirIter_ != endIter_) {
-        // 1. 构造文件路径
-        std::string visFilename = dirIter_->path().filename().string();
-        std::string visPath = dirIter_->path().string();
-        std::string irPath = irDir_ + "/" + visFilename; // 假设文件名相同
-        
-        // 迭代器步进，为下一次 produce 做准备
-        ++dirIter_;
+    while (next_index_ < frame_pairs_.size()) {
+        const FramePair& frame_pair = frame_pairs_[next_index_++];
 
-        // 2. 读取图像 (Visible 读彩色，IR 读灰度)
-        cv::Mat visRaw = cv::imread(visPath, cv::IMREAD_COLOR);
-        cv::Mat irRaw = cv::imread(irPath, cv::IMREAD_GRAYSCALE);
+        auto packet = std::make_unique<FusionDataPacket>(
+            next_index_ - 1,
+            model_width_,
+            model_height_);
+        packet->filename = frame_pair.filename;
+        packet->vis_raw_bgr = cv::imread(frame_pair.vis_path, cv::IMREAD_COLOR);
+        packet->ir_raw_gray = cv::imread(frame_pair.ir_path, cv::IMREAD_GRAYSCALE);
 
-        if (visRaw.empty() || irRaw.empty()) {
-            std::cerr << "[FusionDataSource] 警告: 图像读取失败或缺失配对，跳过: " << visFilename << std::endl;
-            continue; 
+        if (packet->vis_raw_bgr.empty() || packet->ir_raw_gray.empty()) {
+            LOG.warning(
+                "[FusionDataSource] Failed to read image pair %s, skipping",
+                frame_pair.filename.c_str());
+            continue;
         }
 
-        // 3. 创建 Packet 并装载数据
-        auto packet = std::make_unique<FusionDataPacket>();
-        packet->packet_idx = current_idx_++; // 赋值并自增
-        packet->filename = visFilename;
-        
-        // 使用 std::move 转移 cv::Mat 内部指针所有权，避免数据深拷贝
-        packet->vis_raw = std::move(visRaw); 
-        packet->ir_raw = std::move(irRaw);
-
-        // 如果刚好是最后一张图，通知框架后续没有数据了
-        if (dirIter_ == endIter_) {
-            setHasMore(false);
-        }
-
+        setHasMore(next_index_ < frame_pairs_.size());
         return packet;
     }
 
-    // 目录遍历结束
     setHasMore(false);
     return nullptr;
+}
+
+bool FusionDataSource::IsSupportedImageFile(const std::string& extension) {
+    std::string lowered_extension = extension;
+    std::transform(
+        lowered_extension.begin(),
+        lowered_extension.end(),
+        lowered_extension.begin(),
+        [](unsigned char value) {
+            return static_cast<char>(std::tolower(value));
+        });
+    return lowered_extension == ".jpg" ||
+           lowered_extension == ".jpeg" ||
+           lowered_extension == ".png" ||
+           lowered_extension == ".bmp" ||
+           lowered_extension == ".tif" ||
+           lowered_extension == ".tiff";
 }

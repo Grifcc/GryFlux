@@ -1,21 +1,19 @@
 #pragma once
 
 #include "framework/context.h"
-#include <NvInfer.h>
-#include <cuda_runtime.h>
+
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <vector>
 
-struct ModelOutput {
-    void* device_buffer = nullptr;
-    void* host_buffer = nullptr;   
-    size_t size = 0;
-};
+class SharedDetectionModel;
 
 class InferContext : public GryFlux::Context {
 public:
-    InferContext(const std::string& engine_model_path, int device_id = 0);
+    InferContext(
+        std::shared_ptr<SharedDetectionModel> shared_model,
+        int device_id = 0);
     ~InferContext() override;
 
     void bindCurrentThread();
@@ -31,21 +29,21 @@ public:
     size_t getOutputSize(size_t index) const { return output_buffers_[index].size; }
 
 private:
-    void loadEngine(const std::string& engine_model_path);
+    struct ModelOutput {
+        void* device_buffer = nullptr;
+        void* host_buffer = nullptr;
+        size_t size = 0;
+    };
+
+    void createExecutionContext();
     void allocateBuffers();
     void releaseBuffers();
 
-    template <typename T>
-    struct TrtDeleter {
-        void operator()(T* ptr) const;
-    };
-
+    std::shared_ptr<SharedDetectionModel> shared_model_;
     int device_id_ = 0;
-    cudaStream_t stream_ = nullptr;
-
-    std::unique_ptr<nvinfer1::IRuntime, TrtDeleter<nvinfer1::IRuntime>> runtime_;
-    std::unique_ptr<nvinfer1::ICudaEngine, TrtDeleter<nvinfer1::ICudaEngine>> engine_;
-    std::unique_ptr<nvinfer1::IExecutionContext, TrtDeleter<nvinfer1::IExecutionContext>> context_;
+    void* stream_ = nullptr;
+    class ExecutionContextHandle;
+    std::unique_ptr<ExecutionContextHandle> execution_context_;
 
     void* input_buffer_ = nullptr;
     size_t input_buffer_size_ = 0;
@@ -55,3 +53,8 @@ private:
     std::vector<int> output_indices_;
     std::vector<void*> bindings_;
 };
+
+std::vector<std::shared_ptr<GryFlux::Context>> CreateDetectionInferContexts(
+    const std::string& engine_model_path,
+    int device_id,
+    size_t instance_count);

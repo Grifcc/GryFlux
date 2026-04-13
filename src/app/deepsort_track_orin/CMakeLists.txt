@@ -1,93 +1,125 @@
-# 1. 定义项目名称
-project(deepsort_track_orin)
+set(APP_NAME deepsort_track_orin)
+set(APP_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+set(APP_3RDPARTY_DIR ${APP_ROOT_DIR}/3rdparty)
 
-# GryFlux 要求至少使用 C++17 [cite: 1]
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(DEEPSORT_ORIN_OPENCV_ROOT
+    "${APP_3RDPARTY_DIR}/opencv"
+    CACHE PATH "Root directory or config directory for app-local OpenCV")
+set(DEEPSORT_ORIN_CUDA_ROOT
+    "${APP_3RDPARTY_DIR}/cuda"
+    CACHE PATH "CUDA toolkit root for deepsort_track_orin")
+set(DEEPSORT_ORIN_TENSORRT_ROOT
+    "${APP_3RDPARTY_DIR}/TensorRT"
+    CACHE PATH "TensorRT root for deepsort_track_orin")
+set(DEEPSORT_ORIN_EIGEN_ROOT
+    "${APP_3RDPARTY_DIR}/Eigen"
+    CACHE PATH "Eigen root for deepsort_track_orin")
 
-# ==========================================
-# 2. 查找依赖包
-# ==========================================
-find_package(OpenCV REQUIRED)
+find_package(OpenCV CONFIG REQUIRED
+    PATHS
+        ${DEEPSORT_ORIN_OPENCV_ROOT}
+        ${DEEPSORT_ORIN_OPENCV_ROOT}/lib/cmake/opencv4
+        ${DEEPSORT_ORIN_OPENCV_ROOT}/lib64/cmake/opencv4
+    NO_DEFAULT_PATH
+)
+
+set(CUDAToolkit_ROOT ${DEEPSORT_ORIN_CUDA_ROOT})
 find_package(CUDAToolkit REQUIRED)
 
-# 【关键新增】DeepSORT 的数学核心依赖 Eigen3
-find_package(Eigen3 QUIET)
+find_path(TENSORRT_INCLUDE_DIR NvInfer.h
+    HINTS
+        ${DEEPSORT_ORIN_TENSORRT_ROOT}/include
+        ${DEEPSORT_ORIN_TENSORRT_ROOT}/include/aarch64-linux-gnu
+        ${DEEPSORT_ORIN_TENSORRT_ROOT}/targets/aarch64-linux-gnu/include
+    NO_DEFAULT_PATH
+)
+
+find_library(TENSORRT_LIB nvinfer
+    HINTS
+        ${DEEPSORT_ORIN_TENSORRT_ROOT}/lib
+        ${DEEPSORT_ORIN_TENSORRT_ROOT}/lib64
+        ${DEEPSORT_ORIN_TENSORRT_ROOT}/lib/aarch64-linux-gnu
+        ${DEEPSORT_ORIN_TENSORRT_ROOT}/targets/aarch64-linux-gnu/lib
+        ${DEEPSORT_ORIN_TENSORRT_ROOT}/targets/aarch64-linux/lib
+    NO_DEFAULT_PATH
+)
+
+if(NOT TENSORRT_INCLUDE_DIR OR NOT TENSORRT_LIB)
+    message(FATAL_ERROR
+        "TensorRT was not found for deepsort_track_orin. "
+        "Populate src/app/deepsort_track_orin/3rdparty/TensorRT or pass "
+        "-DDEEPSORT_ORIN_TENSORRT_ROOT=<TensorRT root>.")
+endif()
+
+find_package(Eigen3 QUIET CONFIG
+    PATHS
+        ${DEEPSORT_ORIN_EIGEN_ROOT}
+        ${DEEPSORT_ORIN_EIGEN_ROOT}/share/eigen3/cmake
+        ${DEEPSORT_ORIN_EIGEN_ROOT}/lib/cmake/eigen3
+        ${DEEPSORT_ORIN_EIGEN_ROOT}/lib64/cmake/eigen3
+    NO_DEFAULT_PATH
+)
+
 if(NOT Eigen3_FOUND)
     find_path(EIGEN3_INCLUDE_DIR Eigen/Dense
-        PATHS
-            /usr/include/eigen3
-            /usr/local/include/eigen3
+        HINTS
+            ${DEEPSORT_ORIN_EIGEN_ROOT}/include/eigen3
+            ${DEEPSORT_ORIN_EIGEN_ROOT}/eigen3
+            ${DEEPSORT_ORIN_EIGEN_ROOT}/include
+        NO_DEFAULT_PATH
     )
     if(NOT EIGEN3_INCLUDE_DIR)
-        message(FATAL_ERROR "Eigen3 not found. Please install eigen3-dev or set EIGEN3_INCLUDE_DIR.")
+        message(FATAL_ERROR
+            "Eigen was not found for deepsort_track_orin. Populate "
+            "src/app/deepsort_track_orin/3rdparty/Eigen or pass "
+            "-DDEEPSORT_ORIN_EIGEN_ROOT=<Eigen root>.")
     endif()
     set(EIGEN3_INCLUDE_DIRS ${EIGEN3_INCLUDE_DIR})
 endif()
 
-find_path(TENSORRT_INCLUDE_DIR NvInfer.h
-    PATHS
-        /usr/include
-        /usr/include/x86_64-linux-gnu
-        /usr/include/aarch64-linux-gnu
-        /usr/local/include
-)
-find_library(TENSORRT_LIB nvinfer
-    PATHS
-        /usr/lib
-        /usr/lib/x86_64-linux-gnu
-        /usr/lib/aarch64-linux-gnu
-        /usr/local/lib
-        /usr/local/TensorRT/lib
-)
-
-if(NOT TENSORRT_INCLUDE_DIR OR NOT TENSORRT_LIB)
-    message(FATAL_ERROR "TensorRT not found. Please set TENSORRT_INCLUDE_DIR and TENSORRT_LIB.")
-endif()
-
-# ==========================================
-# 3. 收集源文件
-# ==========================================
-# 收集当前工程目录下所有的 .cpp (包含 nodes, utils, context 等子目录)
-file(GLOB_RECURSE APP_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp" 
+set(APP_SOURCES
+    consumer/result_consumer.cpp
+    context/infercontext.cpp
+    context/reid_context.cpp
+    source/image_data_source.cpp
+    deepsort_track_orin.cpp
+    utils/deepsort_tracker.cpp
+    utils/kalman_filter.cpp
+    utils/linear_assignment.cpp
+    utils/nn_matching.cpp
+    utils/track.cpp
+    nodes/Input/InputNode.cpp
+    nodes/Preprocess/PreprocessNode.cpp
+    nodes/DetectionInference/DetectionInferenceNode.cpp
+    nodes/Postprocess/PostprocessNode.cpp
+    nodes/ReidPreprocess/ReidPreprocessNode.cpp
+    nodes/ReidInference/ReidInferenceNode.cpp
+    nodes/Output/OutputNode.cpp
 )
 
-# 生成可执行文件
-# 注意：${SRC_DIR} 通常是在根目录 CMake 中定义的框架源码列表
-add_executable(${PROJECT_NAME}
+add_executable(${APP_NAME}
     ${APP_SOURCES}
     ${SRC_DIR}
 )
 
-# ==========================================
-# 4. 包含头文件目录
-# ==========================================
-target_include_directories(${PROJECT_NAME} PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}         # 包含当前目录 (用于找到 packet/)
-    ${CMAKE_CURRENT_SOURCE_DIR}/utils   # 【优化】直接包含 utils，代码里可以直接 #include "datatype.h"
-    ${OpenCV_INCLUDE_DIRS}              # OpenCV 头文件 [cite: 1]
-    ${EIGEN3_INCLUDE_DIRS}              # 【新增】Eigen 头文件
+target_include_directories(${APP_NAME} PRIVATE
+    ${APP_ROOT_DIR}
+    ${APP_ROOT_DIR}/utils
+    ${OpenCV_INCLUDE_DIRS}
     ${TENSORRT_INCLUDE_DIR}
     ${CUDAToolkit_INCLUDE_DIRS}
+    ${EIGEN3_INCLUDE_DIRS}
 )
 
-# ==========================================
-# 5. 链接库
-# ==========================================
-target_link_libraries(${PROJECT_NAME} PRIVATE
-    ${dynamic_libs}    # 框架定义的通用库
-    ${OpenCV_LIBS}     # OpenCV 库
+target_link_libraries(${APP_NAME} PRIVATE
+    ${dynamic_libs}
+    ${OpenCV_LIBS}
     CUDA::cudart
     ${TENSORRT_LIB}
 )
 
 if(TARGET Eigen3::Eigen)
-    target_link_libraries(${PROJECT_NAME} PRIVATE Eigen3::Eigen)
+    target_link_libraries(${APP_NAME} PRIVATE Eigen3::Eigen)
 endif()
 
-# ==========================================
-# 6. 安装规则
-# ==========================================
-install(TARGETS ${PROJECT_NAME}
-        RUNTIME DESTINATION bin)
+install(TARGETS ${APP_NAME} DESTINATION bin)

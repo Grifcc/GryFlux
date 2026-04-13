@@ -1,8 +1,14 @@
 #include "reid_context.h"
+
+#include <NvInfer.h>
+#include <cuda_runtime.h>
+
 #include <cstring>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
+#include <utility>
+#include <vector>
 
 #define CUDA_CHECK_THROW(op, error_msg) \
     do { \
@@ -20,6 +26,20 @@
     } while (0)
 
 namespace {
+
+template <typename T>
+struct TrtDeleter {
+    void operator()(T* ptr) const {
+        if (!ptr) {
+            return;
+        }
+#if NV_TENSORRT_MAJOR >= 10
+        delete ptr;
+#else
+        ptr->destroy();
+#endif
+    }
+};
 
 class TrtLogger : public nvinfer1::ILogger {
 public:
@@ -110,29 +130,119 @@ bool enqueueContext(nvinfer1::IExecutionContext& context, std::vector<void*>& bi
 
 }  // namespace
 
-template <typename T>
-void ReidContext::TrtDeleter<T>::operator()(T* ptr) const {
-    if (!ptr) {
-        return;
-    }
-#if NV_TENSORRT_MAJOR >= 10
-    delete ptr;
-#else
-    ptr->destroy();
-#endif
-}
+class SharedReidModel {
+public:
+    explicit SharedReidModel(const std::string& engine_path) {
+        std::ifstream input(engine_path, std::ios::binary);
+        if (!input) {
+            throw std::runtime_error(
+                "Failed to open ReID TensorRT engine file: " + engine_path);
+        }
 
-ReidContext::ReidContext(const std::string& engine_path, int device_id)
-    : device_id_(device_id), input_size_(0), output_size_(0) {
+        input.seekg(0, std::ios::end);
+        const std::streamsize engine_size = input.tellg();
+        input.seekg(0, std::ios::beg);
+        if (engine_size <= 0) {
+            throw std::runtime_error(
+                "ReID TensorRT engine file is empty: " + engine_path);
+        }
+
+        std::vector<char> engine_data(static_cast<size_t>(engine_size));
+        if (!input.read(engine_data.data(), engine_size)) {
+            throw std::runtime_error(
+                "Failed to read ReID TensorRT engine file: " + engine_path);
+        }
+
+        runtime_.reset(nvinfer1::createInferRuntime(trtLogger()));
+        TRT_CHECK_THROW(runtime_ != nullptr,
+                        "Failed to create ReID TensorRT runtime");
+
+        engine_.reset(
+            runtime_->deserializeCudaEngine(engine_data.data(), engine_data.size()));
+        TRT_CHECK_THROW(engine_ != nullptr,
+                        "Failed to deserialize ReID TensorRT engine");
+
+        InspectBindings();
+    }
+
+    int bindingCount() const { return ::bindingCount(*engine_); }
+    int inputBindingIndex() const { return input_binding_index_; }
+    int outputBindingIndex() const { return output_binding_index_; }
+    size_t inputBufferSize() const { return input_size_; }
+    size_t outputBufferSize() const { return output_size_; }
+
+    std::unique_ptr<nvinfer1::IExecutionContext, TrtDeleter<nvinfer1::IExecutionContext>>
+    createExecutionContext() const {
+        auto execution_context =
+            std::unique_ptr<nvinfer1::IExecutionContext,
+                            TrtDeleter<nvinfer1::IExecutionContext>>(
+                engine_->createExecutionContext());
+        TRT_CHECK_THROW(execution_context != nullptr,
+                        "Failed to create ReID TensorRT execution context");
+        return execution_context;
+    }
+
+private:
+    void InspectBindings() {
+        const int total_bindings = ::bindingCount(*engine_);
+        for (int binding_index = 0; binding_index < total_bindings; ++binding_index) {
+            const size_t tensor_bytes = bindingSize(*engine_, binding_index);
+            if (bindingIsInput(*engine_, binding_index)) {
+                input_binding_index_ = binding_index;
+                input_size_ = tensor_bytes;
+                continue;
+            }
+
+            output_binding_index_ = binding_index;
+            output_size_ = tensor_bytes;
+        }
+
+        if (input_binding_index_ < 0 || output_binding_index_ < 0) {
+            throw std::runtime_error(
+                "ReID TensorRT engine does not expose the expected bindings");
+        }
+    }
+
+    std::unique_ptr<nvinfer1::IRuntime, TrtDeleter<nvinfer1::IRuntime>> runtime_;
+    std::unique_ptr<nvinfer1::ICudaEngine, TrtDeleter<nvinfer1::ICudaEngine>> engine_;
+    int input_binding_index_ = -1;
+    int output_binding_index_ = -1;
+    size_t input_size_ = 0;
+    size_t output_size_ = 0;
+};
+
+class ReidContext::ExecutionContextHandle {
+public:
+    explicit ExecutionContextHandle(
+        std::unique_ptr<nvinfer1::IExecutionContext,
+                        TrtDeleter<nvinfer1::IExecutionContext>> context)
+        : context_(std::move(context)) {}
+
+    nvinfer1::IExecutionContext& get() { return *context_; }
+
+private:
+    std::unique_ptr<nvinfer1::IExecutionContext,
+                    TrtDeleter<nvinfer1::IExecutionContext>> context_;
+};
+
+ReidContext::ReidContext(
+    std::shared_ptr<SharedReidModel> shared_model,
+    int device_id)
+    : shared_model_(std::move(shared_model)),
+      device_id_(device_id),
+      input_size_(0),
+      output_size_(0) {
     try {
         bindCurrentThread();
-        CUDA_CHECK_THROW(cudaStreamCreate(&stream_), "创建 CUDA Stream 失败");
-        loadEngine(engine_path);
+        cudaStream_t stream = nullptr;
+        CUDA_CHECK_THROW(cudaStreamCreate(&stream), "Failed to create CUDA stream");
+        stream_ = stream;
+        createExecutionContext();
         allocateBuffers();
     } catch (...) {
         releaseBuffers();
         if (stream_) {
-            cudaStreamDestroy(stream_);
+            cudaStreamDestroy(static_cast<cudaStream_t>(stream_));
             stream_ = nullptr;
         }
         throw;
@@ -142,92 +252,88 @@ ReidContext::ReidContext(const std::string& engine_path, int device_id)
 ReidContext::~ReidContext() {
     releaseBuffers();
     if (stream_) {
-        cudaStreamDestroy(stream_);
+        cudaStreamDestroy(static_cast<cudaStream_t>(stream_));
         stream_ = nullptr;
     }
 }
 
 void ReidContext::bindCurrentThread() {
-    CUDA_CHECK_THROW(cudaSetDevice(device_id_), "绑定 CUDA 设备失败");
+    CUDA_CHECK_THROW(cudaSetDevice(device_id_), "Failed to bind CUDA device");
 }
 
 void ReidContext::copyToDevice(const void* data, size_t size) {
     if (size != input_size_) {
-        throw std::runtime_error("ReID 输入大小与 TensorRT Engine 不匹配");
+        throw std::runtime_error("ReID input size does not match TensorRT engine");
     }
-    CUDA_CHECK_THROW(cudaMemcpyAsync(device_input_ptr_, data, size, cudaMemcpyHostToDevice, stream_), "ReID Host to Device 失败");
+    CUDA_CHECK_THROW(
+        cudaMemcpyAsync(
+            device_input_ptr_,
+            data,
+            size,
+            cudaMemcpyHostToDevice,
+            static_cast<cudaStream_t>(stream_)),
+        "Failed to copy ReID input tensor to device");
 }
 
 void ReidContext::execute() {
-    TRT_CHECK_THROW(enqueueContext(*context_, bindings_, stream_), "ReID TensorRT 推理失败");
+    TRT_CHECK_THROW(
+        enqueueContext(
+            execution_context_->get(),
+            bindings_,
+            static_cast<cudaStream_t>(stream_)),
+        "ReID TensorRT inference failed");
 }
 
-std::vector<float> ReidContext::copyToHost(int feature_dim) {
-    const size_t feature_bytes = static_cast<size_t>(feature_dim) * sizeof(float);
+void ReidContext::copyToHost(float* output_data, size_t element_count) {
+    const size_t feature_bytes = element_count * sizeof(float);
     if (feature_bytes > output_size_) {
-        throw std::runtime_error("请求的 ReID 特征维度超过 TensorRT Engine 输出大小");
+        throw std::runtime_error("Requested ReID feature size exceeds TensorRT output");
     }
 
-    CUDA_CHECK_THROW(cudaMemcpyAsync(host_output_ptr_, device_output_ptr_, output_size_, cudaMemcpyDeviceToHost, stream_), "ReID Device to Host 失败");
-    CUDA_CHECK_THROW(cudaStreamSynchronize(stream_), "同步 ReID CUDA Stream 失败");
+    CUDA_CHECK_THROW(
+        cudaMemcpyAsync(
+            host_output_ptr_,
+            device_output_ptr_,
+            output_size_,
+            cudaMemcpyDeviceToHost,
+            static_cast<cudaStream_t>(stream_)),
+        "Failed to copy ReID output tensor to host");
+    CUDA_CHECK_THROW(
+        cudaStreamSynchronize(static_cast<cudaStream_t>(stream_)),
+        "Failed to synchronize ReID CUDA stream");
 
-    std::vector<float> result(feature_dim);
-    std::memcpy(result.data(), host_output_ptr_, feature_bytes);
-    return result;
+    std::memcpy(output_data, host_output_ptr_, feature_bytes);
 }
 
-void ReidContext::loadEngine(const std::string& engine_path) {
-    std::ifstream input(engine_path, std::ios::binary);
-    if (!input) {
-        throw std::runtime_error("无法打开 ReID TensorRT Engine 文件: " + engine_path);
-    }
-
-    input.seekg(0, std::ios::end);
-    const std::streamsize engine_size = input.tellg();
-    input.seekg(0, std::ios::beg);
-
-    if (engine_size <= 0) {
-        throw std::runtime_error("ReID TensorRT Engine 文件为空: " + engine_path);
-    }
-
-    std::vector<char> engine_data(static_cast<size_t>(engine_size));
-    if (!input.read(engine_data.data(), engine_size)) {
-        throw std::runtime_error("读取 ReID TensorRT Engine 文件失败: " + engine_path);
-    }
-
-    runtime_.reset(nvinfer1::createInferRuntime(trtLogger()));
-    TRT_CHECK_THROW(runtime_ != nullptr, "创建 ReID TensorRT Runtime 失败");
-
-    engine_.reset(runtime_->deserializeCudaEngine(engine_data.data(), engine_data.size()));
-    TRT_CHECK_THROW(engine_ != nullptr, "反序列化 ReID TensorRT Engine 失败");
-
-    context_.reset(engine_->createExecutionContext());
-    TRT_CHECK_THROW(context_ != nullptr, "创建 ReID TensorRT ExecutionContext 失败");
+void ReidContext::createExecutionContext() {
+    execution_context_ = std::make_unique<ExecutionContextHandle>(
+        shared_model_->createExecutionContext());
 }
 
 void ReidContext::allocateBuffers() {
-    const int binding_count = bindingCount(*engine_);
+    const int binding_count = shared_model_->bindingCount();
     bindings_.assign(binding_count, nullptr);
 
-    for (int binding_index = 0; binding_index < binding_count; ++binding_index) {
-        const size_t tensor_bytes = bindingSize(*engine_, binding_index);
-        if (bindingIsInput(*engine_, binding_index)) {
-            input_binding_index_ = binding_index;
-            input_size_ = tensor_bytes;
-            CUDA_CHECK_THROW(cudaMalloc(&device_input_ptr_, input_size_), "分配 ReID 输入显存失败");
-            bindings_[binding_index] = device_input_ptr_;
-            continue;
-        }
+    input_binding_index_ = shared_model_->inputBindingIndex();
+    output_binding_index_ = shared_model_->outputBindingIndex();
+    input_size_ = shared_model_->inputBufferSize();
+    output_size_ = shared_model_->outputBufferSize();
 
-        output_binding_index_ = binding_index;
-        output_size_ = tensor_bytes;
-        CUDA_CHECK_THROW(cudaMalloc(&device_output_ptr_, output_size_), "分配 ReID 输出显存失败");
-        CUDA_CHECK_THROW(cudaMallocHost(&host_output_ptr_, output_size_), "分配 ReID 输出主机内存失败");
-        bindings_[binding_index] = device_output_ptr_;
-    }
+    CUDA_CHECK_THROW(
+        cudaMalloc(&device_input_ptr_, input_size_),
+        "Failed to allocate ReID input buffer");
+    CUDA_CHECK_THROW(
+        cudaMalloc(&device_output_ptr_, output_size_),
+        "Failed to allocate ReID output device buffer");
+    CUDA_CHECK_THROW(
+        cudaMallocHost(&host_output_ptr_, output_size_),
+        "Failed to allocate ReID output host buffer");
+    bindings_[input_binding_index_] = device_input_ptr_;
+    bindings_[output_binding_index_] = device_output_ptr_;
 
     if (input_binding_index_ < 0 || output_binding_index_ < 0) {
-        throw std::runtime_error("ReID TensorRT Engine 的输入输出数量不符合示例要求");
+        throw std::runtime_error(
+            "ReID TensorRT engine bindings do not match deepsort_track_orin");
     }
 }
 
@@ -250,4 +356,21 @@ void ReidContext::releaseBuffers() {
     output_binding_index_ = -1;
     input_size_ = 0;
     output_size_ = 0;
+}
+
+std::vector<std::shared_ptr<GryFlux::Context>> CreateReidInferContexts(
+    const std::string& engine_path,
+    int device_id,
+    size_t instance_count) {
+    if (instance_count == 0) {
+        throw std::runtime_error("ReID context instance count must be greater than zero");
+    }
+
+    auto shared_model = std::make_shared<SharedReidModel>(engine_path);
+    std::vector<std::shared_ptr<GryFlux::Context>> contexts;
+    contexts.reserve(instance_count);
+    for (size_t index = 0; index < instance_count; ++index) {
+        contexts.push_back(std::make_shared<ReidContext>(shared_model, device_id));
+    }
+    return contexts;
 }
