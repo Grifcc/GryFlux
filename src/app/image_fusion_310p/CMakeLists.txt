@@ -1,66 +1,114 @@
-# 定义项目名称
-project(image_fusion_310p)
+cmake_minimum_required(VERSION 3.16)
 
-# GryFlux 要求至少使用 C++17
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    project(image_fusion_310p LANGUAGES CXX C)
+    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# ==========================================
-# 1. 查找依赖包 (OpenCV & Ascend ACL)
-# ==========================================
-# 查找 OpenCV
-find_package(OpenCV REQUIRED)
+    get_filename_component(GRYFLUX_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
 
-# 配置 Ascend ACL 路径
-set(ASCEND_PATH "/usr/local/Ascend/ascend-toolkit/latest" CACHE PATH "Ascend Toolkit Path")
+    add_library(project_includes INTERFACE)
+    target_include_directories(project_includes INTERFACE
+        ${GRYFLUX_ROOT_DIR}/include
+    )
 
-# ==========================================
-# 2. 收集源文件并生成可执行文件
-# ==========================================
-# 收集当前应用目录下的所有 .cpp 文件 (包含 source, nodes, context 等)
-file(GLOB_RECURSE APP_SOURCES
-    "*.cpp" 
+    set(dynamic_libs
+        pthread
+        project_includes
+    )
+
+    aux_source_directory(${GRYFLUX_ROOT_DIR}/src/framework SRC_DIR)
+    aux_source_directory(${GRYFLUX_ROOT_DIR}/src/utils SRC_DIR)
+endif()
+
+set(APP_NAME image_fusion_310p)
+set(APP_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+set(APP_3RDPARTY_DIR ${APP_ROOT_DIR}/3rdparty)
+
+set(IMAGE_FUSION_310P_OPENCV_ROOT
+    "${APP_3RDPARTY_DIR}/opencv"
+    CACHE PATH "Root directory or config directory for app-local OpenCV")
+set(IMAGE_FUSION_310P_ASCEND_ROOT
+    "${APP_3RDPARTY_DIR}/ascend-toolkit/latest"
+    CACHE PATH "Ascend Toolkit root for image_fusion_310p")
+
+if(EXISTS "${IMAGE_FUSION_310P_OPENCV_ROOT}")
+    find_package(OpenCV CONFIG REQUIRED
+        PATHS
+            ${IMAGE_FUSION_310P_OPENCV_ROOT}
+            ${IMAGE_FUSION_310P_OPENCV_ROOT}/lib/cmake/opencv4
+            ${IMAGE_FUSION_310P_OPENCV_ROOT}/lib64/cmake/opencv4
+        NO_DEFAULT_PATH
+    )
+else()
+    find_package(OpenCV REQUIRED)
+endif()
+
+find_path(ASCEND_ACL_INCLUDE_DIR acl/acl.h
+    HINTS
+        ${IMAGE_FUSION_310P_ASCEND_ROOT}/include
+        /usr/local/Ascend/ascend-toolkit/latest/include
 )
 
-# 这里的 ${SRC_DIR} 是在根目录 CMakeLists.txt 中定义的 GryFlux 框架源码路径
-# 将框架源码和应用源码一起编译成可执行程序
-add_executable(${PROJECT_NAME}
+find_library(ASCEND_ACL_LIB ascendcl
+    HINTS
+        ${IMAGE_FUSION_310P_ASCEND_ROOT}/lib64
+        /usr/local/Ascend/ascend-toolkit/latest/lib64
+)
+
+if(NOT ASCEND_ACL_INCLUDE_DIR OR NOT ASCEND_ACL_LIB)
+    message(FATAL_ERROR
+        "Ascend ACL was not found for image_fusion_310p. "
+        "Populate src/app/image_fusion_310p/3rdparty/ascend-toolkit/latest or pass "
+        "-DIMAGE_FUSION_310P_ASCEND_ROOT=<Ascend Toolkit root>.")
+endif()
+
+set(ASCEND_RUNTIME_DIRS
+    ${IMAGE_FUSION_310P_ASCEND_ROOT}/lib64
+    ${IMAGE_FUSION_310P_ASCEND_ROOT}/x86_64-linux/lib64
+    ${IMAGE_FUSION_310P_ASCEND_ROOT}/aarch64-linux/lib64
+    /usr/local/Ascend/ascend-toolkit/latest/lib64
+    /usr/local/Ascend/ascend-toolkit/latest/x86_64-linux/lib64
+    /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64
+)
+list(REMOVE_DUPLICATES ASCEND_RUNTIME_DIRS)
+
+set(APP_SOURCES
+    consumer/result_consumer.cpp
+    context/infercontext.cpp
+    source/fusion_data_source.cpp
+    image_fusion_310p.cpp
+    nodes/Input/InputNode.cpp
+    nodes/Preprocess/PreprocessNode.cpp
+    nodes/Inference/InferenceNode.cpp
+    nodes/Postprocess/PostprocessNode.cpp
+    nodes/Output/OutputNode.cpp
+)
+
+add_executable(${APP_NAME}
     ${APP_SOURCES}
     ${SRC_DIR}
 )
 
-# ==========================================
-# 3. 包含头文件目录
-# ==========================================
-target_include_directories(${PROJECT_NAME} PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}         # 包含当前目录以支持相对路径引用
-    ${OpenCV_INCLUDE_DIRS}              # OpenCV 头文件
-    ${ASCEND_PATH}/include              # ACL 头文件
-    ${INC_DIR}                          # GryFlux 框架头文件目录 (假设根目录已定义 INC_DIR)
+target_include_directories(${APP_NAME} PRIVATE
+    ${APP_ROOT_DIR}
+    ${OpenCV_INCLUDE_DIRS}
+    ${ASCEND_ACL_INCLUDE_DIR}
 )
 
-# ==========================================
-# 4. 链接库
-# ==========================================
-# 添加 ACL 动态库的搜索路径
-target_link_directories(${PROJECT_NAME} PRIVATE ${ASCEND_PATH}/lib64)
-
-# 使用根目录中定义的 dynamic_libs (包含 pthread, dl 等基础库)
-# 并链接业务所需的 OpenCV 和 ACL 库
-target_link_libraries(${PROJECT_NAME}
-    PRIVATE
-    ${dynamic_libs}                     # 基础动态库
-    ${OpenCV_LIBS}                      # OpenCV 库
-    ascendcl                            # 昇腾 ACL 核心库
-    stdc++fs                            # 用于 std::filesystem 支持
+target_link_libraries(${APP_NAME} PRIVATE
+    ${dynamic_libs}
+    ${OpenCV_LIBS}
+    ${ASCEND_ACL_LIB}
 )
 
-# 如果启用了性能分析宏，则添加定义
-if(GRYFLUX_BUILD_PROFILING)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE GRYFLUX_BUILD_PROFILING=1)
-endif()
+target_link_options(${APP_NAME} PRIVATE
+    -Wl,--disable-new-dtags
+)
 
-# ==========================================
-# 5. 安装配置 (执行 make install 时拷贝到 bin 目录)
-# ==========================================
-install(TARGETS ${PROJECT_NAME} DESTINATION bin)
+set_target_properties(${APP_NAME} PROPERTIES
+    BUILD_RPATH "${ASCEND_RUNTIME_DIRS}"
+    INSTALL_RPATH "${ASCEND_RUNTIME_DIRS}"
+)
+
+install(TARGETS ${APP_NAME} DESTINATION bin)

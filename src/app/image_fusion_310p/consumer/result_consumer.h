@@ -1,16 +1,22 @@
 #pragma once
 
 #include "framework/data_consumer.h"
+
+#include <cstdint>
+#include <map>
 #include <string>
 
-class FusionDataConsumer : public GryFlux::DataConsumer {
+class ResultConsumer : public GryFlux::DataConsumer {
 public:
-    explicit FusionDataConsumer(const std::string& saveDir);
-    ~FusionDataConsumer() override = default;
+    explicit ResultConsumer(const std::string& output_dir);
+    ~ResultConsumer() override = default;
 
-    // 框架会自动调用此方法，传入处理完的数据包
     void consume(std::unique_ptr<GryFlux::DataPacket> packet) override;
 
 private:
-    std::string saveDir_;
+    void WriteSequentialPacket(class FusionDataPacket* packet);
+
+    std::string output_dir_;
+    uint64_t expected_packet_idx_ = 0;
+    std::map<uint64_t, std::unique_ptr<GryFlux::DataPacket>> reorder_buffer_;
 };

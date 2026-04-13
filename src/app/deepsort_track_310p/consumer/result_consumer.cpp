@@ -1,80 +1,103 @@
 #include "result_consumer.h"
-#include <iostream>
 
-ResultConsumer::ResultConsumer(const std::string& output_path, double fps, int width, int height) {
-    // 1. 初始化 DeepSORT 追踪器
-    tracker_ = std::make_unique<DeepSortTracker>(0.4f, 100);
-    
-    // 2. 初始化视频写入器
-    writer_.open(output_path, cv::VideoWriter::fourcc('m', 'p', '4', 'v'), fps, cv::Size(width, height));
+#include "utils/logger.h"
+
+#include <Eigen/Core>
+
+#include <stdexcept>
+
+namespace {
+
+double NormalizeFps(double fps) {
+    return fps > 0.0 ? fps : 25.0;
+}
+
+}  // namespace
+
+ResultConsumer::ResultConsumer(
+    const std::string& output_path,
+    double fps,
+    int width,
+    int height)
+    : tracker_(std::make_unique<DeepSortTracker>(0.4f, 100)),
+      writer_(output_path,
+              cv::VideoWriter::fourcc('m', 'p', '4', 'v'),
+              NormalizeFps(fps),
+              cv::Size(width, height)) {
+    if (!writer_.isOpened()) {
+        throw std::runtime_error("Failed to create tracking output video: " + output_path);
+    }
+
+    LOG.info("[ResultConsumer] Writing DeepSORT output to %s", output_path.c_str());
 }
 
 ResultConsumer::~ResultConsumer() {
     if (writer_.isOpened()) {
         writer_.release();
+        LOG.info("[ResultConsumer] Output video finalized");
     }
 }
 
 void ResultConsumer::consume(std::unique_ptr<GryFlux::DataPacket> packet) {
-    auto* p = static_cast<TrackDataPacket*>(packet.get());
+    auto* track_packet = static_cast<TrackDataPacket*>(packet.get());
+    reorder_buffer_[track_packet->frame_id] = std::move(packet);
 
-    // --- 步骤 A: 放入缓冲区 ---
-    // 无论谁先到，先按 frame_id 塞进 map 候车室
-    reorder_buffer_[p->frame_id] = std::move(packet);
-
-    // --- 步骤 B: 检查顺序，放行数据 ---
-    // 只要候车室里有我们要的“下一帧”，就循环处理
     while (reorder_buffer_.count(expected_frame_id_) > 0) {
-        
-        // 1. 取出当前顺序正确的帧
         auto current_packet = std::move(reorder_buffer_[expected_frame_id_]);
         reorder_buffer_.erase(expected_frame_id_);
-        
-        // 2. 执行真正的业务逻辑
-        processSequentialFrame(static_cast<TrackDataPacket*>(current_packet.get()));
-
-        // 3. 期望值递增，寻找下一帧
-        expected_frame_id_++;
+        ProcessSequentialFrame(static_cast<TrackDataPacket*>(current_packet.get()));
+        ++expected_frame_id_;
     }
 }
 
-void ResultConsumer::processSequentialFrame(TrackDataPacket* p) {
-    // 2. 将检测框和特征向量打包成算法需要的 DETECTIONS (std::vector<DETECTION_ROW>)
-    DETECTIONS ds_input;
-    
-    for (size_t i = 0; i < p->detections.size(); ++i) {
-        const auto& d = p->detections[i];
-        // 假设 tlwh 格式为 [x1, y1, w, h]
+void ResultConsumer::ProcessSequentialFrame(TrackDataPacket* packet) {
+    DETECTIONS tracker_input;
+    const size_t usable_count =
+        std::min(packet->detections.size(), packet->active_reid_feature_count);
+    tracker_input.reserve(usable_count);
+
+    if (packet->detections.size() != packet->active_reid_feature_count) {
+        LOG.warning(
+            "[ResultConsumer] Frame %d detection/feature count mismatch: %zu vs %zu",
+            packet->frame_id,
+            packet->detections.size(),
+            packet->active_reid_feature_count);
+    }
+
+    for (size_t index = 0; index < usable_count; ++index) {
+        const auto& detection = packet->detections[index];
+        const auto& feature_data = packet->reid_features[index];
+        if (feature_data.empty()) {
+            continue;
+        }
+
         DETECTBOX box;
-        box << d.x1, d.y1, d.x2 - d.x1, d.y2 - d.y1;
-        
-        // 获取对应的特征向量 (需要从 std::vector<float> 转为 Eigen::Matrix)
-        FEATURE feat = Eigen::Map<FEATURE>(p->reid_features[i].data());
-        
-        ds_input.emplace_back(box, d.score, feat);
+        box << detection.x1,
+               detection.y1,
+               detection.x2 - detection.x1,
+               detection.y2 - detection.y1;
 
+        FEATURE feature = Eigen::Map<const FEATURE>(feature_data.data());
+        tracker_input.emplace_back(box, detection.score, feature);
     }
 
-    // 3. 调用单参数的 update
-    p->active_tracks = tracker_->update(ds_input);
+    packet->active_tracks = tracker_->update(tracker_input);
 
-    // 4. 修正绘图逻辑 (使用 to_tlwh() 获取坐标)
-    for (const auto& track : p->active_tracks) {
-        auto tlwh = track.to_tlwh();
-        cv::Rect rect(tlwh(0), tlwh(1), tlwh(2), tlwh(3));
-        cv::rectangle(p->original_image, rect, cv::Scalar(0, 255, 0), 2);
-        
-        std::string label = "ID: " + std::to_string(track.track_id);
-        cv::putText(p->original_image, label, cv::Point(rect.x, rect.y - 5), 
-                    cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 255, 0), 2);
+    for (const auto& track : packet->active_tracks) {
+        const auto tlwh = track.to_tlwh();
+        const cv::Rect rect(tlwh(0), tlwh(1), tlwh(2), tlwh(3));
+        cv::rectangle(packet->original_image, rect, cv::Scalar(0, 255, 0), 2);
+        cv::putText(packet->original_image,
+                    "ID: " + std::to_string(track.track_id),
+                    cv::Point(rect.x, rect.y - 5),
+                    cv::FONT_HERSHEY_SIMPLEX,
+                    0.6,
+                    cv::Scalar(0, 255, 0),
+                    2);
     }
 
-    // 3. 写入文件
-    if (writer_.isOpened()) {
-        writer_.write(p->original_image);
-    }
-
-    if (p->frame_id % 30 == 0) {
-        std::cout << "[Consumer] 已处理至第 " << p->frame_id << " 帧" << std::endl;
+    writer_.write(packet->original_image);
+    if (packet->frame_id % 30 == 0) {
+        LOG.info("[ResultConsumer] Processed frame %d", packet->frame_id);
     }
 }

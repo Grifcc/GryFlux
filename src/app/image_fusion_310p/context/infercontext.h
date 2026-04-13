@@ -1,50 +1,66 @@
 #pragma once
 
 #include "framework/context.h"
-#include "acl/acl.h"
-#include <string>
 
-// 必须继承自框架的 Context 基类
+#include "acl/acl.h"
+#include "acl/acl_mdl.h"
+
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <vector>
+
+struct FusionModelInfo {
+    int model_width = 0;
+    int model_height = 0;
+    size_t input_element_count = 0;
+    size_t output_element_count = 0;
+};
+
+struct FusionInferResourceBundle {
+    FusionModelInfo model_info;
+    std::vector<std::shared_ptr<GryFlux::Context>> contexts;
+};
+
 class InferContext : public GryFlux::Context {
 public:
-    InferContext();
+    InferContext(const std::string& model_path, int device_id);
     ~InferContext() override;
 
-    // 初始化此单个 Context 实例（加载模型，分配一份独立的 Device 内存）
-    bool Init(const std::string& modelPath, int deviceId);
-    void Destroy();
+    void bindCurrentThread();
 
-    // --- 给 InferNode 调用的 Getter 接口 ---
-    uint32_t GetModelId() const { return modelId_; }
-    size_t GetInputSize() const { return modelInputSize_; }
-    size_t GetOutputSize() const { return modelOutputSize_; }
+    size_t GetInputElementCount(size_t index) const;
+    size_t GetOutputElementCount() const;
 
-    // 获取已经组装好的 Dataset，Node 拿到后直接喂给 aclmdlExecute
-    aclmdlDataset* GetInputDataset() const { return inputDataset_; }
-    aclmdlDataset* GetOutputDataset() const { return outputDataset_; }
-
-    // 获取对应的 Device 内存指针，用于 Node 执行 aclrtMemcpy
-    void* GetVisDevPtr() const { return visDevPtr_; }
-    void* GetIrDevPtr() const { return irDevPtr_; }
-    void* GetOutDevPtr() const { return outDevPtr_; }
-    void bindCurrentThread() {
-        if (deviceId_ >= 0) {
-            aclrtSetDevice(deviceId_);
-        }
-    }
+    void copyInputToDevice(size_t index, const float* host_data, size_t element_count);
+    void execute();
+    void copyOutputToHost(float* host_data, size_t element_count);
 
 private:
-    int32_t deviceId_;
-    uint32_t modelId_;
-    aclmdlDesc* modelDesc_;
-    
-    size_t modelInputSize_;
-    size_t modelOutputSize_;
+    struct TensorBuffer {
+        void* device_ptr = nullptr;
+        void* host_ptr = nullptr;
+        size_t byte_size = 0;
+        size_t element_count = 0;
+    };
 
-    // 单个 Context 实例独享的硬件资源缓存
-    aclmdlDataset* inputDataset_ = nullptr;
-    aclmdlDataset* outputDataset_ = nullptr;
-    void* visDevPtr_ = nullptr;
-    void* irDevPtr_ = nullptr;
-    void* outDevPtr_ = nullptr;
+    void destroyDatasets() noexcept;
+    void destroyBuffers() noexcept;
+
+    int device_id_ = 0;
+    aclrtContext context_ = nullptr;
+    aclrtStream stream_ = nullptr;
+    uint32_t model_id_ = 0;
+    aclmdlDesc* model_desc_ = nullptr;
+    aclmdlDataset* input_dataset_ = nullptr;
+    aclmdlDataset* output_dataset_ = nullptr;
+    std::vector<TensorBuffer> input_buffers_;
+    TensorBuffer output_buffer_;
 };
+
+FusionInferResourceBundle CreateFusionInferResourceBundle(
+    const std::string& model_path,
+    int device_id,
+    size_t instance_count,
+    int fallback_width,
+    int fallback_height);
