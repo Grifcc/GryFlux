@@ -10,7 +10,7 @@
 - 如何使用 `ResourcePool` 注册双 Atlas 设备资源并自动分发推理任务
 - 如何在全部样本完成后统一统计 Top-1 / Top-5 / FPS
 
-本应用入口在 `src/app/resnet_Atlas/resnet_Atlas.cpp`，可执行文件名为 `classification_app_gryflux`。
+本应用入口在 `src/app/resnet_Atlas/resnet_Atlas.cpp`，可执行文件名为 `resnet_atlas`。
 
 ## 快速上手
 
@@ -55,11 +55,13 @@ struct ResNetPacket : public GryFlux::DataPacket {
 
 节点只需要继承 `GryFlux::NodeBase` 并实现 `execute()`。
 
-当前示例中共有三个节点：
-
+- `InputNode`
 - `PreprocessNode`
 - `ResNetInferNode`
 - `PostprocessNode`
+- `OutputNode`
+
+其中 `InputNode` 和 `OutputNode` 是空透传节点，用来让图结构和 `example/example.cpp` 保持一致。
 
 #### 2.1 `PreprocessNode`
 
@@ -147,6 +149,9 @@ void executeInference(const std::vector<float>& host_input, std::vector<float>& 
     std::lock_guard<std::mutex> lock(npu_mutex_);
 
     ACL_CHECK(aclrtSetCurrentContext(context_));
+    if (host_input.size() * sizeof(float) != inputSize_) {
+        throw std::runtime_error("host_input size mismatch");
+    }
     ACL_CHECK(aclrtMemcpy(inputDevBuffer_, inputSize_, host_input.data(), inputSize_, ACL_MEMCPY_HOST_TO_DEVICE));
     ACL_CHECK(aclmdlExecute(modelId_, inputDataset_, outputDataset_));
     ACL_CHECK(aclrtMemcpy(host_output.data(), outputSize_, outputDevBuffer_, outputSize_, ACL_MEMCPY_DEVICE_TO_HOST));
@@ -186,16 +191,18 @@ resourcePool->registerResourceType("atlas_npu", std::move(atlas_contexts));
 ```cpp
 auto graphTemplate = GryFlux::GraphTemplate::buildOnce(
     [](GryFlux::TemplateBuilder *builder) {
-        builder->setInputNode<PreprocessNode>("preprocess");
+        builder->setInputNode<InputNode>("input");
+        builder->addTask<PreprocessNode>("preprocess", "", {"input"});
         builder->addTask<ResNetInferNode>("inference", "atlas_npu", {"preprocess"});
-        builder->setOutputNode<PostprocessNode>("postprocess", {"inference"});
+        builder->addTask<PostprocessNode>("postprocess", "", {"inference"});
+        builder->setOutputNode<OutputNode>("output", {"postprocess"});
     }
 );
 ```
 
 也就是说，本示例的依赖关系是：
 
-`preprocess -> inference -> postprocess`
+`input -> preprocess -> inference -> postprocess -> output`
 
 ### 6) 运行异步管道（AsyncPipeline）
 
@@ -213,19 +220,26 @@ GryFlux::AsyncPipeline pipeline(
 );
 ```
 
-随后主程序把 `pipeline.run()` 放进后台线程运行，并在主线程中等待 `consumer->get_future()`：
+当前主程序直接阻塞调用 `pipeline.run()`：
 
 ```cpp
-auto finish_signal = consumer->get_future();
-
-std::thread pipeline_thread([&pipeline]() {
-    pipeline.run();
-});
-
-finish_signal.get();
+pipeline.run();
 ```
 
-这使得主线程不会卡死在 `run()` 内部，而是能够在全部样本完成后优雅收尾。
+如果编译时开启了 profiling，还会在运行前启用 profiler，并在结束后输出统计和导出时间线：
+
+```cpp
+if constexpr (GryFlux::Profiling::kBuildProfiling) {
+    pipeline.setProfilingEnabled(true);
+}
+
+pipeline.run();
+
+if constexpr (GryFlux::Profiling::kBuildProfiling) {
+    pipeline.printProfilingStats();
+    pipeline.dumpProfilingTimeline("graph_timeline_resnet.json");
+}
+```
 
 ## 示例 DAG 结构
 
@@ -237,7 +251,7 @@ DAG 结构图：
 
 - `source`：`ResNetDataSource`
 - `packet`：`ResNetPacket`
-- `nodes`：`PreprocessNode -> ResNetInferNode -> PostprocessNode`
+- `nodes`：`InputNode -> PreprocessNode -> ResNetInferNode -> PostprocessNode -> OutputNode`
 - `context`：`AtlasContext`
 - `consumer`：`ResNetResultConsumer`
 
@@ -301,13 +315,13 @@ bash build.sh
 构建完成后，可执行文件位于：
 
 ```bash
-build/src/app/resnet_Atlas/classification_app_gryflux
+build/src/app/resnet_Atlas/resnet_atlas
 ```
 
 ### 2) 运行
 
 ```bash
-./build/src/app/resnet_Atlas/classification_app_gryflux <om_model_path> <dataset_dir> <gt_file_path>
+./build/src/app/resnet_Atlas/resnet_atlas <om_model_path> <dataset_dir> <gt_file_path>
 ```
 
 程序启动参数共 3 个：
@@ -316,6 +330,9 @@ build/src/app/resnet_Atlas/classification_app_gryflux
 - `dataset_dir`：图片目录路径
 - `gt_file_path`：标签文件路径
 
+其中 `dataset_dir` 需要和 `gt_file_path` 中记录的相对路径对齐。  
+例如标签文件里如果是 `n03445777/xxx.JPEG`，而图片实际在 `val/n03445777/xxx.JPEG` 下，那么这里应传 `.../val`，不是数据集根目录。
+
 程序会输出：
 
 - 已处理数量
@@ -323,11 +340,17 @@ build/src/app/resnet_Atlas/classification_app_gryflux
 - FPS
 - Top-1 / Top-5 准确率
 
-## 时间线资产与可视化
+## Profiling 与时间线
 
-当前目录下附带了一份手工整理的 timeline 示例文件：
+如果编译时启用了 profiling：
 
-- `assets/timeline_resnet.json`
+```bash
+bash build.sh --enable_profile
+```
+
+程序运行结束后会额外输出 profiling 统计，并导出：
+
+- `graph_timeline_resnet.json`
 
 你可以像 `example/README.md` 一样，用网页查看时间线：
 
@@ -338,16 +361,12 @@ http://profile.grifcc.top:8076/
 操作方式：
 
 1. 浏览器打开该页面
-2. 选择 `timeline_resnet.json`
+2. 选择 `graph_timeline_resnet.json`
 3. 生成 packet 级 timeline
 
 同时目录中还提供了：
 
 - `assets/chart.svg`：简化 DAG 图
-
-需要说明的是：  
-当前 `resnet_Atlas` 代码本身还没有像 `example` 那样直接调用 `pipeline.dumpProfilingTimeline(...)`。  
-所以这里的 `timeline_resnet.json` 是为了展示当前 DAG 结构而准备的示例资产，而不是程序自动导出的 profiling 结果。
 
 ## 指标说明
 
@@ -361,16 +380,14 @@ http://profile.grifcc.top:8076/
 实现方式是：
 
 - 每处理完一个 packet 就更新统计值
-- 最后一个 packet 到达时通过 `promise` 通知主线程
-- 主线程再调用 `printMetrics()` 打印汇总结果
+- `pipeline.run()` 返回后调用 `printMetrics()` 打印汇总结果
 
 ## 退出与稳定性说明
 
 为保证“处理完成后正常退出”，当前实现采用：
 
-- 主线程等待 Consumer 的完成信号
-- `pipeline.run()` 放入后台线程执行
-- 流水线线程在结束后 `join`
+- GT 文件检查放在 `aclInit()` 之前
+- 主线程直接调用 `pipeline.run()`
 - `DataSource` 在耗尽时正确更新 `hasMore`
 - 所有资源最终通过 `aclFinalize()` 统一释放
 
@@ -388,9 +405,10 @@ http://profile.grifcc.top:8076/
 - `source/resnet_data_source.h`: 数据源
 - `packet/resnet_packet.h`: 数据包定义
 - `context/atlas_context.h`: Atlas 资源上下文
+- `nodes/Input/InputNode.cpp`: 输入节点
 - `nodes/Preprocess/PreprocessNode.cpp`: 图像预处理
 - `nodes/Infer/InferNode.cpp`: NPU 推理执行
 - `nodes/Postprocess/PostprocessNode.cpp`: Top-K 后处理
-- `consumer/resnet_result_consumer.h`: 结果统计与完成信号
+- `nodes/Output/OutputNode.cpp`: 输出节点
+- `consumer/resnet_result_consumer.h`: 结果统计
 - `assets/chart.svg`: DAG 图
-- `assets/timeline_resnet.json`: timeline 示例数据

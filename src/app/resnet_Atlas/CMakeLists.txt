@@ -1,16 +1,10 @@
-set(CUR_APP_NAME classification_app_gryflux)
+set(CUR_APP_NAME resnet_atlas)
 
 # 1. 收集你写的 ResNet 源文件
 file(GLOB_RECURSE APP_SOURCES "*.cpp")
 
-# 2. 收集 GryFlux 框架底层真正干活的源码
-file(GLOB_RECURSE GRYFLUX_CORE_SRC 
-    "${PROJECT_SOURCE_DIR}/src/framework/*.cpp"
-    "${PROJECT_SOURCE_DIR}/src/utils/*.cpp"
-)
-
-# 3. 将你的代码和框架代码揉在一起生成可执行文件
-add_executable(${CUR_APP_NAME} ${APP_SOURCES} ${GRYFLUX_CORE_SRC})
+# 2. 将你的代码和框架代码揉在一起生成可执行文件
+add_executable(${CUR_APP_NAME} ${APP_SOURCES} ${SRC_DIR})
 
 # 4. 强制 C++17 标准
 target_compile_features(${CUR_APP_NAME} PRIVATE cxx_std_17)
@@ -19,7 +13,10 @@ target_compile_features(${CUR_APP_NAME} PRIVATE cxx_std_17)
 find_package(OpenCV REQUIRED)
 
 # 6. 定义华为工具链路径
-set(ASCEND_TOOLKIT_HOME "/usr/local/Ascend/ascend-toolkit/latest")
+set(ASCEND_TOOLKIT_HOME "$ENV{ASCEND_TOOLKIT_HOME}" CACHE PATH "Ascend toolkit root")
+if(NOT ASCEND_TOOLKIT_HOME)
+    set(ASCEND_TOOLKIT_HOME "/usr/local/Ascend/ascend-toolkit/latest")
+endif()
 
 # 7. 指定头文件搜索路径
 target_include_directories(${CUR_APP_NAME} PRIVATE
@@ -43,3 +40,5 @@ target_link_libraries(${CUR_APP_NAME}
     pthread
     dl
 )
+
+install(TARGETS ${CUR_APP_NAME} DESTINATION bin)

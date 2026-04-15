@@ -2,8 +2,6 @@
 #include <fstream>
 #include <string>
 #include <map>
-#include <chrono>
-#include <thread>
 
 #include "acl/acl.h"
 #include "framework/async_pipeline.h"
@@ -13,6 +11,8 @@
 #include "source/resnet_data_source.h"
 #include "consumer/resnet_result_consumer.h"
 #include "context/atlas_context.h"
+#include "nodes/Input/InputNode.h"
+#include "nodes/Output/OutputNode.h"
 #include "nodes/Preprocess/PreprocessNode.h"
 #include "nodes/Infer/InferNode.h"
 #include "nodes/Postprocess/PostprocessNode.h"
@@ -73,11 +73,11 @@ int main(int argc, char* argv[]) {
 
     auto graphTemplate = GryFlux::GraphTemplate::buildOnce(
         [](GryFlux::TemplateBuilder *builder) {
-            builder->setInputNode<PreprocessNode>("preprocess");
-            
+            builder->setInputNode<InputNode>("input");
+            builder->addTask<PreprocessNode>("preprocess", "", {"input"});
             builder->addTask<ResNetInferNode>("inference", "atlas_npu", {"preprocess"});
-            
-            builder->setOutputNode<PostprocessNode>("postprocess", {"inference"});
+            builder->addTask<PostprocessNode>("postprocess", "", {"inference"});
+            builder->setOutputNode<OutputNode>("output", {"postprocess"});
         }
     );
 
@@ -93,25 +93,23 @@ int main(int argc, char* argv[]) {
         kMaxActivePackets
     );
 
-    std::cout << "[INFO] --- 引擎点火，开始异步评估 ---" << std::endl;
-    
-
-    auto finish_signal = consumer->get_future();
-
-    std::thread pipeline_thread([&pipeline]() {
-        pipeline.run();
-    });
-
-    finish_signal.get();
-
-    if (pipeline_thread.joinable()) {
-        pipeline_thread.join();
+    if constexpr (GryFlux::Profiling::kBuildProfiling) {
+        pipeline.setProfilingEnabled(true);
     }
+
+    std::cout << "[INFO] 开始执行推理..." << std::endl;
+
+    pipeline.run();
 
     consumer->printMetrics();
 
+    if constexpr (GryFlux::Profiling::kBuildProfiling) {
+        pipeline.printProfilingStats();
+        pipeline.dumpProfilingTimeline("graph_timeline_resnet.json");
+    }
+
     aclFinalize();
-    std::cout << "[INFO] ACL 底层硬件资源已完全释放，程序优雅退出。" << std::endl;
+    std::cout << "[INFO] ACL 资源已释放，程序结束。" << std::endl;
     
     return 0;
 }

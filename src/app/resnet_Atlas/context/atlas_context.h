@@ -2,60 +2,55 @@
 #include "framework/async_pipeline.h"
 #include "acl/acl.h"
 #include <iostream>
+#include <stdexcept>
 #include <vector>
 #include <string>
 #include <mutex>
 
-#define ACL_CHECK(expr)                                                         \
-    do {                                                                        \
-        aclError ret = (expr);                                                  \
-        if (ret != ACL_SUCCESS) {                                               \
-            std::cerr << "ACL Error: " << ret << " at " << __FILE__ << ":"      \
-                      << __LINE__ << " calling " << #expr << std::endl;         \
-        }                                                                       \
-    } while (0)
+inline void CheckAcl(aclError ret, const char* expr, const char* file, int line) {
+    if (ret == ACL_SUCCESS) return;
+    throw std::runtime_error(
+        std::string("ACL Error: ") + std::to_string(ret) +
+        " at " + file + ":" + std::to_string(line) +
+        " calling " + expr
+    );
+}
+
+#define ACL_CHECK(expr) CheckAcl((expr), #expr, __FILE__, __LINE__)
 
 class AtlasContext : public GryFlux::Context {
 public:
     AtlasContext(int deviceId, const std::string& modelPath) : deviceId_(deviceId) {
-        ACL_CHECK(aclrtSetDevice(deviceId_));
-        
-        ACL_CHECK(aclrtCreateContext(&context_, deviceId_));
-        ACL_CHECK(aclrtSetCurrentContext(context_)); 
+        try {
+            ACL_CHECK(aclrtSetDevice(deviceId_));
+            ACL_CHECK(aclrtCreateContext(&context_, deviceId_));
+            ACL_CHECK(aclrtSetCurrentContext(context_));
+            ACL_CHECK(aclmdlLoadFromFile(modelPath.c_str(), &modelId_));
 
-        ACL_CHECK(aclmdlLoadFromFile(modelPath.c_str(), &modelId_));
-        
-        modelDesc_ = aclmdlCreateDesc();
-        ACL_CHECK(aclmdlGetDesc(modelDesc_, modelId_));
+            modelDesc_ = aclmdlCreateDesc();
+            ACL_CHECK(aclmdlGetDesc(modelDesc_, modelId_));
 
-        inputSize_ = aclmdlGetInputSizeByIndex(modelDesc_, 0);
-        ACL_CHECK(aclrtMalloc(&inputDevBuffer_, inputSize_, ACL_MEM_MALLOC_HUGE_FIRST));
-        inputDataset_ = aclmdlCreateDataset();
-        inputDataBuffer_ = aclCreateDataBuffer(inputDevBuffer_, inputSize_);
-        ACL_CHECK(aclmdlAddDatasetBuffer(inputDataset_, inputDataBuffer_));
+            inputSize_ = aclmdlGetInputSizeByIndex(modelDesc_, 0);
+            ACL_CHECK(aclrtMalloc(&inputDevBuffer_, inputSize_, ACL_MEM_MALLOC_HUGE_FIRST));
+            inputDataset_ = aclmdlCreateDataset();
+            inputDataBuffer_ = aclCreateDataBuffer(inputDevBuffer_, inputSize_);
+            ACL_CHECK(aclmdlAddDatasetBuffer(inputDataset_, inputDataBuffer_));
 
-        outputSize_ = aclmdlGetOutputSizeByIndex(modelDesc_, 0);
-        ACL_CHECK(aclrtMalloc(&outputDevBuffer_, outputSize_, ACL_MEM_MALLOC_HUGE_FIRST));
-        outputDataset_ = aclmdlCreateDataset();
-        outputDataBuffer_ = aclCreateDataBuffer(outputDevBuffer_, outputSize_);
-        ACL_CHECK(aclmdlAddDatasetBuffer(outputDataset_, outputDataBuffer_));
-        
+            outputSize_ = aclmdlGetOutputSizeByIndex(modelDesc_, 0);
+            ACL_CHECK(aclrtMalloc(&outputDevBuffer_, outputSize_, ACL_MEM_MALLOC_HUGE_FIRST));
+            outputDataset_ = aclmdlCreateDataset();
+            outputDataBuffer_ = aclCreateDataBuffer(outputDevBuffer_, outputSize_);
+            ACL_CHECK(aclmdlAddDatasetBuffer(outputDataset_, outputDataBuffer_));
+        } catch (...) {
+            cleanup();
+            throw;
+        }
+
         std::cout << "[INFO] NPU " << deviceId_ << " 资源与模型加载完成。" << std::endl;
     }
 
     ~AtlasContext() {
-        aclrtSetCurrentContext(context_);
-
-        ACL_CHECK(aclrtFree(inputDevBuffer_));
-        ACL_CHECK(aclrtFree(outputDevBuffer_));
-        aclDestroyDataBuffer(inputDataBuffer_);
-        aclDestroyDataBuffer(outputDataBuffer_);
-        aclmdlDestroyDataset(inputDataset_);
-        aclmdlDestroyDataset(outputDataset_);
-        aclmdlUnload(modelId_);
-        aclmdlDestroyDesc(modelDesc_);
-        
-        ACL_CHECK(aclrtDestroyContext(context_)); 
+        cleanup();
     }
 
     int getDeviceId() const { return deviceId_; }
@@ -64,6 +59,10 @@ public:
         std::lock_guard<std::mutex> lock(npu_mutex_);
 
         ACL_CHECK(aclrtSetCurrentContext(context_));
+
+        if (host_input.size() * sizeof(float) != inputSize_) {
+            throw std::runtime_error("host_input size mismatch");
+        }
 
         if (host_output.size() * sizeof(float) < outputSize_) {
             host_output.resize(outputSize_ / sizeof(float));
@@ -75,6 +74,51 @@ public:
     }
 
 private:
+    void cleanup() noexcept {
+        if (context_ != nullptr) {
+            aclrtSetCurrentContext(context_);
+        }
+
+        if (inputDataBuffer_ != nullptr) {
+            aclDestroyDataBuffer(inputDataBuffer_);
+            inputDataBuffer_ = nullptr;
+        }
+        if (inputDataset_ != nullptr) {
+            aclmdlDestroyDataset(inputDataset_);
+            inputDataset_ = nullptr;
+        }
+        if (inputDevBuffer_ != nullptr) {
+            aclrtFree(inputDevBuffer_);
+            inputDevBuffer_ = nullptr;
+        }
+
+        if (outputDataBuffer_ != nullptr) {
+            aclDestroyDataBuffer(outputDataBuffer_);
+            outputDataBuffer_ = nullptr;
+        }
+        if (outputDataset_ != nullptr) {
+            aclmdlDestroyDataset(outputDataset_);
+            outputDataset_ = nullptr;
+        }
+        if (outputDevBuffer_ != nullptr) {
+            aclrtFree(outputDevBuffer_);
+            outputDevBuffer_ = nullptr;
+        }
+
+        if (modelId_ != 0) {
+            aclmdlUnload(modelId_);
+            modelId_ = 0;
+        }
+        if (modelDesc_ != nullptr) {
+            aclmdlDestroyDesc(modelDesc_);
+            modelDesc_ = nullptr;
+        }
+        if (context_ != nullptr) {
+            aclrtDestroyContext(context_);
+            context_ = nullptr;
+        }
+    }
+
     int deviceId_ = 0;
     aclrtContext context_ = nullptr;
     uint32_t modelId_ = 0;
