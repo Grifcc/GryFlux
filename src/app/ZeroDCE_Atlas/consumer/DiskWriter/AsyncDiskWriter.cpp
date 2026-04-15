@@ -29,7 +29,7 @@ void AsyncDiskWriter::Push(uint64_t frame_id, const cv::Mat& img) {
 }
 
 void AsyncDiskWriter::ProcessQueue() {
-    while (is_running_) {
+    while (true) {
         Task task;
         {
             std::unique_lock<std::mutex> lock(mtx_);

@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <stdexcept>
 #include "framework/context.h"
 #include "acl/acl.h"
 
@@ -14,6 +15,8 @@ public:
     aclmdlDesc* GetModelDesc() const { return model_desc_; }
 
 private:
+    void cleanup() noexcept;
+
     int device_id_;
     aclrtContext context_ = nullptr;
     uint32_t model_id_ = 0;

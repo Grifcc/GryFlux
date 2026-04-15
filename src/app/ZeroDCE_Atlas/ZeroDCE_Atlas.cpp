@@ -1,6 +1,5 @@
 #include <iostream>
 #include <string>
-#include <chrono>
 #include "acl/acl.h"
 #include "framework/async_pipeline.h"
 #include "framework/template_builder.h"
@@ -10,6 +9,8 @@
 #include "consumer/DiskWriter/AsyncDiskWriter.h"
 
 #include "context/AtlasContext.h"
+#include "nodes/Input/InputNode.h"
+#include "nodes/Output/OutputNode.h"
 #include "nodes/Preprocess/PreprocessNode.h"
 #include "nodes/Infer/InferNode.h"
 #include "nodes/Postprocess/PostprocessNode.h"
@@ -27,16 +28,19 @@ int main(int argc, char* argv[]) {
 
     cv::setNumThreads(0);
 
+    auto source = std::make_shared<ZeroDceDataSource>(inputDir);
+    if (source->GetTotalFrames() == 0) {
+        std::cerr << "未找到可处理的输入图片！" << std::endl;
+        return 1;
+    }
+
     if (aclInit(nullptr) != ACL_SUCCESS) {
         std::cerr << "ACL 初始化失败！" << std::endl;
         return 1;
     }
 
-    std::cout << "[INFO] --- 开始配置 Zero-DCE 图像增强异步流水线 ---" << std::endl;
+    std::cout << "[INFO] 开始初始化 ZeroDCE 流水线。" << std::endl;
 
-    AsyncDiskWriter::GetInstance().Start(outputDir);
-
-    auto source = std::make_shared<ZeroDceDataSource>(inputDir);
     auto consumer = std::make_shared<ZeroDceResultConsumer>(source->GetTotalFrames());
 
     auto resourcePool = std::make_shared<GryFlux::ResourcePool>();
@@ -49,9 +53,11 @@ int main(int argc, char* argv[]) {
 
     auto graphTemplate = GryFlux::GraphTemplate::buildOnce(
         [](GryFlux::TemplateBuilder *builder) {
-            builder->setInputNode<PreprocessNode>("preprocess");
+            builder->setInputNode<InputNode>("input");
+            builder->addTask<PreprocessNode>("preprocess", "", {"input"});
             builder->addTask<InferNode>("inference", "atlas_npu", {"preprocess"});
-            builder->setOutputNode<PostprocessNode>("postprocess", {"inference"});
+            builder->addTask<PostprocessNode>("postprocess", "", {"inference"});
+            builder->setOutputNode<OutputNode>("output", {"postprocess"});
         }
     );
 
@@ -66,26 +72,27 @@ int main(int argc, char* argv[]) {
         kMaxActivePackets
     );
 
-    std::cout << "[INFO] --- 引擎点火，开始极速图像增强 ---" << std::endl;
-    
-    auto finish_signal = consumer->get_future();
+    AsyncDiskWriter::GetInstance().Start(outputDir);
 
-    std::thread pipeline_thread([&pipeline]() {
-        pipeline.run();
-    });
-
-    finish_signal.get();
-
-    if (pipeline_thread.joinable()) {
-        pipeline_thread.join();
+    if constexpr (GryFlux::Profiling::kBuildProfiling) {
+        pipeline.setProfilingEnabled(true);
     }
+
+    std::cout << "[INFO] 开始处理图片..." << std::endl;
+
+    pipeline.run();
 
     consumer->printMetrics();
 
     AsyncDiskWriter::GetInstance().Stop();
 
+    if constexpr (GryFlux::Profiling::kBuildProfiling) {
+        pipeline.printProfilingStats();
+        pipeline.dumpProfilingTimeline("graph_timeline_zero_dce.json");
+    }
+
     aclFinalize();
-    std::cout << "[INFO] ACL 硬件资源及 I/O 线程已完全释放，程序优雅退出。" << std::endl;
+    std::cout << "[INFO] ACL 资源已释放，程序结束。" << std::endl;
     
     return 0;
 }

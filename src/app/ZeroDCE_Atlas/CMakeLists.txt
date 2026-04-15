@@ -5,40 +5,42 @@ set(ZERODCE_SRC
     context/AtlasContext.cpp                         
     consumer/ResultConsumer/ZeroDceResultConsumer.cpp 
     consumer/DiskWriter/AsyncDiskWriter.cpp         
+    nodes/Input/InputNode.cpp
     nodes/Preprocess/PreprocessNode.cpp
     nodes/Infer/InferNode.cpp
     nodes/Postprocess/PostprocessNode.cpp
+    nodes/Output/OutputNode.cpp
 )
 
-# 2. 自动搜索并加入 GryFlux 框架的核心源码和工具源码
-file(GLOB FRAMEWORK_SRC 
-    "${CMAKE_SOURCE_DIR}/src/framework/*.cpp"
-    "${CMAKE_SOURCE_DIR}/src/utils/*.cpp"
-)
-
-# 3. 将你的代码和框架代码打包在一起编译
-add_executable(zero_dce_app ${ZERODCE_SRC} ${FRAMEWORK_SRC})
+# 2. 将你的代码和框架代码打包在一起编译
+set(CUR_APP_NAME zero_dce_app)
+add_executable(${CUR_APP_NAME} ${ZERODCE_SRC} ${SRC_DIR})
 
 find_package(OpenCV REQUIRED)
-# 4. 指定头文件搜索路径
-target_include_directories(zero_dce_app PRIVATE 
+# 3. 指定头文件搜索路径
+set(ASCEND_TOOLKIT_HOME "$ENV{ASCEND_TOOLKIT_HOME}" CACHE PATH "Ascend toolkit root")
+if(NOT ASCEND_TOOLKIT_HOME)
+    set(ASCEND_TOOLKIT_HOME "/usr/local/Ascend/ascend-toolkit/latest")
+endif()
+
+target_include_directories(${CUR_APP_NAME} PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}           
     ${CMAKE_SOURCE_DIR}/src       
     ${CMAKE_SOURCE_DIR}/include   
     ${OpenCV_INCLUDE_DIRS}
-    /usr/local/Ascend/ascend-toolkit/latest/include 
-    /usr/local/Ascend/ascend-toolkit/latest/acllib/include
+    ${ASCEND_TOOLKIT_HOME}/include
+    ${ASCEND_TOOLKIT_HOME}/acllib/include
 )
 
-target_link_directories(zero_dce_app PRIVATE 
-    /usr/local/Ascend/ascend-toolkit/latest/lib64
-    /usr/local/Ascend/ascend-toolkit/latest/acllib/lib64
-    /usr/local/Ascend/ascend-toolkit/latest/x86_64-linux/acllib/lib64
+target_link_directories(${CUR_APP_NAME} PRIVATE 
+    ${ASCEND_TOOLKIT_HOME}/lib64
+    ${ASCEND_TOOLKIT_HOME}/acllib/lib64
+    ${ASCEND_TOOLKIT_HOME}/x86_64-linux/acllib/lib64
 )
 
-# 5. 链接动态库
-target_link_libraries(zero_dce_app PRIVATE 
+# 4. 链接动态库
+target_link_libraries(${CUR_APP_NAME} PRIVATE 
     ascendcl            
     opencv_core 
     opencv_imgcodecs 
@@ -46,3 +48,5 @@ target_link_libraries(zero_dce_app PRIVATE
     opencv_dnn
     pthread
 )
+
+install(TARGETS ${CUR_APP_NAME} DESTINATION bin)
