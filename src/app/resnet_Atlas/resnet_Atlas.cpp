@@ -49,15 +49,15 @@ int main(int argc, char* argv[]) {
 
     cv::setNumThreads(0);
 
+    auto gt_map = LoadGroundTruth(gtFilePath);
+    if (gt_map.empty()) return 1;
+
     if (aclInit(nullptr) != ACL_SUCCESS) {
         std::cerr << "ACL 初始化失败！" << std::endl;
         return 1;
     }
 
     std::cout << "[INFO] --- 开始配置 GryFlux 异步流水线 ---" << std::endl;
-
-    auto gt_map = LoadGroundTruth(gtFilePath);
-    if (gt_map.empty()) return 1;
     
     auto source = std::make_shared<ResNetDataSource>(datasetDir, gt_map);
     auto consumer = std::make_shared<ResNetResultConsumer>(gt_map.size());
