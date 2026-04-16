@@ -74,34 +74,36 @@ namespace GryFlux
     AsyncGraphProcessor::~AsyncGraphProcessor()
     {
         stop();
+        scheduler_.reset();
+        threadPool_.reset();
     }
 
     void AsyncGraphProcessor::start()
     {
-        if (isRunning_)
+        if (isRunning_.load(std::memory_order_acquire))
         {
             LOG.warning("AsyncGraphProcessor already running");
             return;
         }
 
-        isRunning_ = true;
+        isRunning_.store(true, std::memory_order_release);
         LOG.info("AsyncGraphProcessor started");
     }
 
     void AsyncGraphProcessor::stop()
     {
-        if (!isRunning_)
+        if (!isRunning_.load(std::memory_order_acquire))
         {
             return;
         }
 
-        isRunning_ = false;
+        isRunning_.store(false, std::memory_order_release);
         LOG.info("AsyncGraphProcessor stopped");
     }
 
     void AsyncGraphProcessor::submitPacket(std::unique_ptr<DataPacket> packet)
     {
-        if (!isRunning_)
+        if (!isRunning_.load(std::memory_order_acquire))
         {
             LOG.error("Cannot submit packet: AsyncGraphProcessor not running");
             return;
@@ -133,6 +135,11 @@ namespace GryFlux
         std::unique_ptr<DataPacket> result;
         outputQueue_.try_pop(result);
         return result;
+    }
+
+    bool AsyncGraphProcessor::waitForOutput(std::unique_ptr<DataPacket> &packet, std::chrono::milliseconds timeout)
+    {
+        return outputQueue_.wait_for_and_pop(packet, timeout);
     }
 
     size_t AsyncGraphProcessor::getOutputQueueSize() const

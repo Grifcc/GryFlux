@@ -43,6 +43,17 @@ public:
      * @param packet 完成的数据包（unique_ptr，转移所有权）
      */
     virtual void consume(std::unique_ptr<DataPacket> packet) = 0;
+
+    /**
+     * @brief 消费失败数据包（可选）
+     *
+     * 当数据包在图执行中失败时，AsyncPipeline 会调用该接口。
+     * 默认实现为 no-op；如需统一处理失败包，请在子类中重写。
+     */
+    virtual void consumeFailed(std::unique_ptr<DataPacket> packet)
+    {
+        (void)packet;
+    }
 };
 
 } // namespace GryFlux

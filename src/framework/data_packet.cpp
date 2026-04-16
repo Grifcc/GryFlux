@@ -16,12 +16,23 @@
  *************************************************************************************************************************/
 #include "framework/data_packet.h"
 #include "framework/graph_template.h"
+#include <stdexcept>
 
 namespace GryFlux
 {
 
     void DataPacket::initializeExecution(std::shared_ptr<GraphTemplate> tmpl)
     {
+        if (!tmpl)
+        {
+            throw std::invalid_argument("GraphTemplate is null");
+        }
+
+        if (tmpl->getNodeCount() == 0)
+        {
+            throw std::runtime_error("GraphTemplate has no nodes");
+        }
+
         executionState_.graphTemplate = tmpl;
         executionState_.isGraphCompleted.store(false, std::memory_order_relaxed);
         executionState_.hasFailed.store(false, std::memory_order_relaxed);
@@ -46,7 +57,7 @@ namespace GryFlux
         }
 
         // 输入节点立即就绪（无依赖）
-        executionState_.nodeStates[0]->unfinishedPredecessorCount.store(0, std::memory_order_relaxed);
+        executionState_.nodeStates[tmpl->getInputNodeIndex()]->unfinishedPredecessorCount.store(0, std::memory_order_relaxed);
     }
 
     bool DataPacket::tryMarkNodeReady(size_t nodeIndex)
@@ -107,7 +118,25 @@ namespace GryFlux
 
     bool DataPacket::markTaskFinished()
     {
-        const uint32_t remaining = executionState_.inFlight.fetch_sub(1, std::memory_order_acq_rel) - 1;
+        uint32_t scheduledCount = executionState_.inFlight.load(std::memory_order_acquire);
+        while (true)
+        {
+            if (scheduledCount == 0)
+            {
+                return false;
+            }
+
+            if (executionState_.inFlight.compare_exchange_weak(
+                    scheduledCount,
+                    scheduledCount - 1,
+                    std::memory_order_acq_rel,
+                    std::memory_order_acquire))
+            {
+                break;
+            }
+        }
+
+        const uint32_t remaining = scheduledCount - 1;
         if (remaining != 0)
         {
             return false;

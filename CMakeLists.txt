@@ -32,6 +32,14 @@ set(CXX_STD "17" CACHE STRING "C++ standard")
 set(CMAKE_CXX_STANDARD ${CXX_STD})
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Unified output directories
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/bin")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib")
+
+# Build options
+option(BUILD_EXAMPLE "Build the example application" ON)
+
 # Apply common compile flags
 set_common_compile_flags()
 

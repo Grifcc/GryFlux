@@ -1,1 +1,3 @@
-add_subdirectory(example)
+if(BUILD_EXAMPLE)
+	add_subdirectory(example)
+endif()
