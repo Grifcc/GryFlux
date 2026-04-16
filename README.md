@@ -370,7 +370,7 @@ AsyncPipeline pipeline(source, template, pool, consumer, 16, 15);
 ### 调度开销
 
 - ✅ **事件驱动** - 节点完成立即触发后继，无轮询
-- ✅ **无锁队列** - ThreadSafeQueue 高效入队/出队
+- ✅ **线程安全队列** - 基于互斥锁 + 条件变量实现高效入队/出队
 - ✅ **原子操作** - 依赖计数用原子操作，减少锁竞争
 
 ---
@@ -393,6 +393,21 @@ cmake ..
 make -j8
 ```
 
+### 常用构建选项
+
+按需关闭 example，避免每次都构建示例程序：
+
+```bash
+cmake -S . -B build -DBUILD_EXAMPLE=OFF
+cmake --build build -j
+```
+
+输出目录已统一配置：
+
+- 可执行文件输出到 build/bin
+- 动态库输出到 build/lib
+- 静态库输出到 build/lib
+
 ### 交叉编译（AArch64）
 
 宿主机需要安装 `aarch64-linux-gnu` 工具链（或自带工具链包的 `bin/` 目录）。
@@ -412,11 +427,11 @@ make -j8
 
 ```bash
 # 并行管道示例
-./src/app/example/simple_pipeline_example
+./build/bin/example
 
 # 查看详细日志（修改 simple_pipeline_example.cpp 设置 DEBUG 级别）
 LOG.setLevel(GryFlux::LogLevel::DEBUG);
-make -j8 && ./src/app/example/simple_pipeline_example
+make -j8 && ./build/bin/example
 ```
 
 ### 性能分析（Profiler）

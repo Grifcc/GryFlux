@@ -26,6 +26,7 @@
 #include <unordered_map>
 #include <mutex>
 #include <chrono>
+#include <atomic>
 
 namespace GryFlux
 {
@@ -91,6 +92,18 @@ namespace GryFlux
         std::unique_ptr<DataPacket> tryGetOutput();
 
         /**
+         * @brief 获取完成的数据包（超时阻塞）
+         *
+         * 在给定超时时间内等待输出队列有数据可取，超时返回 false。
+         *
+         * @param packet 输出参数，成功时持有数据包所有权
+         * @param timeout 超时时间
+         * @return true 成功获取数据包
+         * @return false 超时未获取到数据包
+         */
+        bool waitForOutput(std::unique_ptr<DataPacket> &packet, std::chrono::milliseconds timeout);
+
+        /**
          * @brief 获取输出队列大小
          */
         size_t getOutputQueueSize() const;
@@ -117,7 +130,7 @@ namespace GryFlux
         mutable std::mutex activePacketsMutex_;
 
         size_t maxActivePackets_;  // 最大活跃数据包数
-        bool isRunning_;
+        std::atomic<bool> isRunning_;
     };
 
 } // namespace GryFlux

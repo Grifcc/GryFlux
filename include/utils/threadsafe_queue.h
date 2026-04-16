@@ -17,6 +17,7 @@
 #pragma once
 
 #include <condition_variable> // NOLINT
+#include <chrono>
 #include <memory>
 #include <mutex> // NOLINT
 #include <queue>
@@ -57,6 +58,20 @@ public:
                         { return !queue_.empty(); });
         value = std::move(queue_.front());
         queue_.pop();
+    }
+
+    // 超时阻塞等待数据
+    bool wait_for_and_pop(T &value, std::chrono::milliseconds timeout)
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        if (!condition_.wait_for(lock, timeout, [this]
+                                 { return !queue_.empty(); }))
+        {
+            return false;
+        }
+        value = std::move(queue_.front());
+        queue_.pop();
+        return true;
     }
 
     // 非阻塞获取数据（使用移动语义）

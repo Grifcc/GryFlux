@@ -38,6 +38,17 @@ public:
     virtual ~DataSource() = default;
 
     /**
+     * @brief 主动请求数据源停止生产
+     *
+     * AsyncPipeline::stop() 会调用该接口，通知可能阻塞在 produce() 的数据源尽快退出。
+     * 默认实现仅设置 hasMore=false；阻塞型数据源可重写该方法并执行唤醒动作。
+     */
+    virtual void requestStop()
+    {
+        setHasMore(false);
+    }
+
+    /**
      * @brief 产生一个数据包
      *
      * 此方法会被 AsyncPipeline 循环调用，每次调用产生一个新的数据包。
