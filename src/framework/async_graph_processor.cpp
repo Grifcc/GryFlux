@@ -65,6 +65,7 @@ namespace GryFlux
             if (it != activePackets_.end()) {
                 outputQueue_.push(std::move(it->second));
                 activePackets_.erase(it);
+                activePacketCount_.fetch_sub(1, std::memory_order_release);
             } });
 
         LOG.info("AsyncGraphProcessor created with thread pool size %zu, max active packets %zu",
@@ -74,8 +75,8 @@ namespace GryFlux
     AsyncGraphProcessor::~AsyncGraphProcessor()
     {
         stop();
-        scheduler_.reset();
         threadPool_.reset();
+        scheduler_.reset();
     }
 
     void AsyncGraphProcessor::start()
@@ -123,6 +124,7 @@ namespace GryFlux
         {
             std::lock_guard<std::mutex> lock(activePacketsMutex_);
             activePackets_[rawPtr] = std::move(packet);
+            activePacketCount_.fetch_add(1, std::memory_order_release);
         }
 
         // 调度输入节点（索引0）
@@ -149,8 +151,7 @@ namespace GryFlux
 
     size_t AsyncGraphProcessor::getActivePacketCount() const
     {
-        std::lock_guard<std::mutex> lock(activePacketsMutex_);
-        return activePackets_.size();
+        return activePacketCount_.load(std::memory_order_acquire);
     }
 
 } // namespace GryFlux

@@ -429,9 +429,10 @@ cmake --build build -j
 # 并行管道示例
 ./build/bin/example
 
-# 查看详细日志（修改 simple_pipeline_example.cpp 设置 DEBUG 级别）
-LOG.setLevel(GryFlux::LogLevel::DEBUG);
-make -j8 && ./build/bin/example
+# 查看详细日志
+# 1) 修改 src/app/example/example.cpp，将 LOG.setLevel(...) 改为 DEBUG
+# 2) 重新编译并运行
+make -C build -j8 && ./build/bin/example
 ```
 
 ### 性能分析（Profiler）
@@ -490,7 +491,7 @@ pipeline.dumpProfilingTimeline("graph_timeline.json");
 - FeatExtractor 依赖 ImagePreprocess
 - ObjectTracker 融合两个分支的结果
 
-**代码**：见 `src/app/example/simple_pipeline_example.cpp`
+**代码**：见 `src/app/example/example.cpp`
 
 **运行结果**：
 ```
