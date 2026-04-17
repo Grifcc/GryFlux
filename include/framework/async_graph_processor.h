@@ -128,6 +128,7 @@ namespace GryFlux
         // 活跃数据包的所有权管理
         std::unordered_map<DataPacket*, std::unique_ptr<DataPacket>> activePackets_;
         mutable std::mutex activePacketsMutex_;
+        std::atomic<size_t> activePacketCount_{0};
 
         size_t maxActivePackets_;  // 最大活跃数据包数
         std::atomic<bool> isRunning_;
