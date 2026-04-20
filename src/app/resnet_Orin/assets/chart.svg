@@ -60,5 +60,5 @@
 
   <!-- Resource binding -->
   <path d="M555,350 L485,350" class="line" />
-  <text x="520" y="325" class="label-text">atlas_npu</text>
+  <text x="520" y="325" class="label-text">tensorrt_gpu</text>
 </svg>

@@ -21,7 +21,7 @@ public:
 
     void consume(std::unique_ptr<GryFlux::DataPacket> packet) override {
         auto p = static_cast<ResNetPacket*>(packet.get());
-        int current = ++completed_count_;
+        const size_t current = ++completed_count_;
 
         if (p->skipped || !p->is_valid_image) {
             skipped_count_++;
@@ -48,8 +48,8 @@ public:
     void printMetrics() {
         const auto end_time = std::chrono::steady_clock::now();
         const std::chrono::duration<double> diff = end_time - start_time_;
-        const int valid_images = valid_count_.load();
-        const int skipped_images = skipped_count_.load();
+        const size_t valid_images = valid_count_.load();
+        const size_t skipped_images = skipped_count_.load();
         const double top1 =
             valid_images > 0 ? static_cast<double>(top1_correct_.load()) / valid_images * 100.0
                              : 0.0;
@@ -70,11 +70,11 @@ public:
 
 private:
     size_t total_images_;
-    std::atomic<int> completed_count_{0};
-    std::atomic<int> valid_count_{0};
-    std::atomic<int> skipped_count_{0};
-    std::atomic<int> top1_correct_{0};
-    std::atomic<int> top5_correct_{0};
+    std::atomic<size_t> completed_count_{0};
+    std::atomic<size_t> valid_count_{0};
+    std::atomic<size_t> skipped_count_{0};
+    std::atomic<size_t> top1_correct_{0};
+    std::atomic<size_t> top5_correct_{0};
     std::chrono::time_point<std::chrono::steady_clock> start_time_;
     std::promise<void> done_promise_;
     std::atomic<bool> done_signaled_{false};

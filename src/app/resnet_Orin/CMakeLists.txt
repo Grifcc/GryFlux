@@ -204,7 +204,7 @@ install(FILES
 
 install(FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/chart.svg"
-    "${CMAKE_CURRENT_SOURCE_DIR}/assets/timeline_resnet.json"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/timeline_resnet.png"
     DESTINATION "share/${RESNET_ORIN_TARGET_NAME}/assets"
     COMPONENT ${RESNET_ORIN_INSTALL_COMPONENT}
 )

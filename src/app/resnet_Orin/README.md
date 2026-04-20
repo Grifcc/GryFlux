@@ -36,14 +36,18 @@
 
 ```text
 src/app/resnet_Orin/3rdparty/
+├── .gitignore
 ├── README.md
 ├── opencv/
 ├── cuda/
 ├── tensorrt/
 └── models/
+    ├── .gitignore
+    └── README.md
 ```
 
 其中 `opencv/`、`cuda/`、`tensorrt/`、`models/` 可以是实际目录，也可以是软链接，但入口目录固定为 `src/app/resnet_Orin/3rdparty/`。
+仓库中已跟踪 `3rdparty/` 与 `3rdparty/models/` 的占位 README / `.gitignore`，因此 clean checkout 下可以直接进行 configure / install，不需要先手动创建目录。
 
 模型文件需要手动准备，例如：
 
@@ -160,10 +164,13 @@ Top-5 准确率: 97.5541%
 
 - 共享层：`TrtModelHandle` 持有 `IRuntime`、`ICudaEngine` 和张量元信息
 - 执行层：两个 `OrinContext` 实例各自持有独占的 `IExecutionContext`、CUDA stream 和输入输出缓冲
+- 推理节点通过资源类型 `tensorrt_gpu` 从 `ResourcePool` 中获取可复用的 `OrinContext`
 
 补充说明：
 
 - `ResNetPacket` 在构造函数中预分配了输入和输出 buffer
 - `PreprocessNode` 采用短边缩放到 `256`、中心裁剪到 `224x224`、ImageNet `mean/std` 归一化
+- 当前 app 只接受单输入、单输出、静态 shape 的 TensorRT engine；输入 tensor 必须是 `float` 类型且 shape 为 `[1, 3, 224, 224]`
+- 当前 host 侧预处理和后处理都按 `float` tensor 路径实现，输出 tensor 也要求为 `float`
 - `assets/chart.svg` 是当前 DAG 结构示意图
-- `assets/timeline_resnet.json` 是 timeline 示例资产
+- `assets/timeline_resnet.png` 是 timeline 示例资产

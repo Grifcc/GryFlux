@@ -42,15 +42,12 @@ public:
                   << model_handle_->enginePath() << std::endl;
     }
 
-    ~OrinContext() {
-        CUDA_CHECK(cudaSetDevice(deviceId_));
-        CUDA_CHECK(cudaStreamSynchronize(stream_));
-        CUDA_CHECK(cudaFreeHost(hostInputPtr_));
-        CUDA_CHECK(cudaFreeHost(hostOutputPtr_));
-        CUDA_CHECK(cudaStreamDestroy(stream_));
+    ~OrinContext() noexcept {
+        CleanupCudaResources();
 
         if (context_) {
             delete context_;
+            context_ = nullptr;
         }
     }
 
@@ -86,6 +83,39 @@ public:
     }
 
 private:
+    static void LogCudaCleanupError(const char* operation, cudaError_t err) noexcept {
+        if (err != cudaSuccess) {
+            std::cerr << "CUDA cleanup warning: " << operation
+                      << " failed with " << cudaGetErrorString(err) << std::endl;
+        }
+    }
+
+    void CleanupCudaResources() noexcept {
+        const cudaError_t set_device_err = cudaSetDevice(deviceId_);
+        LogCudaCleanupError("cudaSetDevice", set_device_err);
+
+        if (stream_ != nullptr) {
+            LogCudaCleanupError("cudaStreamSynchronize", cudaStreamSynchronize(stream_));
+        }
+
+        if (hostInputPtr_ != nullptr) {
+            LogCudaCleanupError("cudaFreeHost(hostInputPtr_)", cudaFreeHost(hostInputPtr_));
+            hostInputPtr_ = nullptr;
+            devInputPtr_ = nullptr;
+        }
+
+        if (hostOutputPtr_ != nullptr) {
+            LogCudaCleanupError("cudaFreeHost(hostOutputPtr_)", cudaFreeHost(hostOutputPtr_));
+            hostOutputPtr_ = nullptr;
+            devOutputPtr_ = nullptr;
+        }
+
+        if (stream_ != nullptr) {
+            LogCudaCleanupError("cudaStreamDestroy(stream_)", cudaStreamDestroy(stream_));
+            stream_ = nullptr;
+        }
+    }
+
     int deviceId_ = 0;
     cudaStream_t stream_ = nullptr;
     std::shared_ptr<TrtModelHandle> model_handle_;

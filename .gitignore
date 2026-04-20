@@ -153,3 +153,10 @@ install/
 models/
 outputs/
 
+!src/app/resnet_Orin/3rdparty/
+!src/app/resnet_Orin/3rdparty/README.md
+!src/app/resnet_Orin/3rdparty/.gitignore
+!src/app/resnet_Orin/3rdparty/models/
+!src/app/resnet_Orin/3rdparty/models/README.md
+!src/app/resnet_Orin/3rdparty/models/.gitignore
+

@@ -5,7 +5,6 @@
 #include <array>
 #include <iostream>
 #include <cmath>
-#include <mutex>
 
 constexpr int IMG_WIDTH = 224;
 constexpr int IMG_HEIGHT = 224;
@@ -54,12 +53,7 @@ void PreprocessNode::execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx)
     auto &p = static_cast<ResNetPacket&>(packet);
     (void)ctx;
 
-    cv::Mat image;
-    {
-        static std::mutex opencv_decode_mutex;
-        std::lock_guard<std::mutex> lock(opencv_decode_mutex);
-        image = cv::imread(p.image_path, cv::IMREAD_COLOR);
-    }
+    cv::Mat image = cv::imread(p.image_path, cv::IMREAD_COLOR);
 
     if (image.empty()) {
         p.is_valid_image = false;

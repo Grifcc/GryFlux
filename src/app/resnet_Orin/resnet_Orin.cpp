@@ -2,12 +2,10 @@
 #include <cctype>
 #include <filesystem>
 #include <fstream>
-#include <future>
 #include <iostream>
 #include <map>
 #include <memory>
 #include <string>
-#include <thread>
 #include <unordered_set>
 #include <vector>
 
@@ -35,7 +33,7 @@ constexpr size_t kThreadPoolSize = 8;
 constexpr size_t kMaxActivePackets = 16;
 constexpr size_t kOrinContextInstances = 2;
 constexpr int kOrinDeviceId = 0;
-constexpr const char* kOrinResourceType = "atlas_npu";
+constexpr const char* kOrinResourceType = "tensorrt_gpu";
 
 struct AppConfig {
     std::string engine_path;
@@ -249,16 +247,7 @@ int RunApp(const AppConfig& config) {
         kThreadPoolSize,
         kMaxActivePackets);
 
-    std::future<void> finish_signal = runtime.consumer->getFuture();
-    std::thread pipeline_thread([&pipeline]() {
-        pipeline.run();
-    });
-
-    finish_signal.get();
-
-    if (pipeline_thread.joinable()) {
-        pipeline_thread.join();
-    }
+    pipeline.run();
 
     runtime.consumer->printMetrics();
     LOG.info("异步评估结束");
