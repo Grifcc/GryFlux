@@ -1,0 +1,4 @@
+3rdparty/models/*.engine
+3rdparty/models/*.cache
+scripts/__pycache__/
+scripts/*.pyc
