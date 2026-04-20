@@ -1,8 +1,15 @@
 #pragma once
-#include "framework/async_pipeline.h"
+
 #include "framework/node_base.h"
 
-class ResNetInferNode : public GryFlux::NodeBase {
+namespace PipelineNodes {
+
+class InferNode : public GryFlux::NodeBase {
 public:
-    void execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx) override;
+    InferNode() = default;
+    ~InferNode() override = default;
+
+    void execute(GryFlux::DataPacket& packet, GryFlux::Context& ctx) override;
 };
+
+}  // namespace PipelineNodes

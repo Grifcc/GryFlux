@@ -1,8 +1,15 @@
 #pragma once
-#include "framework/async_pipeline.h"
+
 #include "framework/node_base.h"
+
+namespace PipelineNodes {
 
 class OutputNode : public GryFlux::NodeBase {
 public:
-    void execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx) override;
+    OutputNode() = default;
+    ~OutputNode() override = default;
+
+    void execute(GryFlux::DataPacket& packet, GryFlux::Context& ctx) override;
 };
+
+}  // namespace PipelineNodes

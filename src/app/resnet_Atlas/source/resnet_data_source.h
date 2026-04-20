@@ -1,33 +1,19 @@
 #pragma once
-#include "framework/async_pipeline.h"
+
+#include "framework/data_source.h"
 #include "packet/resnet_packet.h"
+
 #include <map>
-#include <string>
 #include <memory>
+#include <string>
 
 class ResNetDataSource : public GryFlux::DataSource {
 public:
-    ResNetDataSource(const std::string& dataset_dir, const std::map<std::string, int>& gt_map)
-        : dataset_dir_(dataset_dir), gt_map_(gt_map) {
-        it_ = gt_map_.begin();
-        setHasMore(it_ != gt_map_.end());
-    }
+    ResNetDataSource(const std::string& dataset_dir,
+                     const std::map<std::string, int>& gt_map);
+    ~ResNetDataSource() override = default;
 
-    std::unique_ptr<GryFlux::DataPacket> produce() override {
-        if (it_ == gt_map_.end()) {
-            setHasMore(false);
-            return nullptr;
-        }
-
-        auto packet = std::make_unique<ResNetPacket>();
-        packet->packet_id = current_id_++; 
-        packet->image_path = dataset_dir_ + "/" + it_->first;
-        packet->ground_truth_label = it_->second;
-
-        ++it_;
-        setHasMore(it_ != gt_map_.end());
-        return packet;
-    }
+    std::unique_ptr<GryFlux::DataPacket> produce() override;
 
 private:
     std::string dataset_dir_;

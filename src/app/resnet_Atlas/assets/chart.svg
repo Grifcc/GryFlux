@@ -1,4 +1,4 @@
-<svg width="800" height="720" viewBox="0 0 800 720" xmlns="http://www.w3.org/2000/svg">
+<svg width="800" height="700" viewBox="0 0 800 700" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
       <polygon points="0 0, 10 3.5, 0 7" fill="#555" />
@@ -8,58 +8,64 @@
       .label-text { font-family: 'Consolas', monospace; font-size: 16px; fill: #E64A19; font-weight: 900; }
       .box { stroke-width: 2; }
       .input-output { fill: #fce4ec; stroke: #880e4f; }
-      .npu-box { fill: #e3f2fd; stroke: #1565c0; }
+      .source-box { fill: #e8f5e9; stroke: #2e7d32; }
+      .packet-box { fill: #fff8e1; stroke: #f9a825; }
       .cpu-box { fill: #ccff90; stroke: #388e3c; }
-      .add-box { fill: #fff8e1; stroke: #f9a825; }
+      .npu-box { fill: #e3f2fd; stroke: #1565c0; }
+      .consumer-box { fill: #ede7f6; stroke: #5e35b1; }
       .line { fill: none; stroke: #555; stroke-width: 1.5; marker-end: url(#arrowhead); }
     </style>
   </defs>
 
-  <ellipse cx="400" cy="55" rx="60" ry="25" class="box input-output" />
-  <text x="400" y="55" class="text">Input</text>
+  <ellipse cx="400" cy="50" rx="60" ry="25" class="box input-output" />
+  <text x="400" y="50" class="text">Input</text>
 
-  <rect x="300" y="135" width="200" height="40" rx="5" class="box cpu-box" />
-  <text x="400" y="155" class="text">ResNetDataSource</text>
+  <rect x="300" y="110" width="200" height="40" rx="5" class="box source-box" />
+  <text x="400" y="130" class="text">ResNetDataSource</text>
 
-  <rect x="300" y="225" width="200" height="40" rx="5" class="box add-box" />
-  <text x="400" y="245" class="text">ResNetPacket</text>
+  <rect x="300" y="180" width="200" height="40" rx="5" class="box packet-box" />
+  <text x="400" y="200" class="text">ResNetPacket</text>
 
-  <rect x="95" y="335" width="170" height="40" rx="5" class="box cpu-box" />
-  <text x="180" y="355" class="text">PreprocessNode</text>
+  <rect x="300" y="250" width="200" height="40" rx="5" class="box cpu-box" />
+  <text x="400" y="270" class="text">InputNode</text>
 
-  <rect x="315" y="335" width="170" height="40" rx="5" class="box npu-box" />
-  <text x="400" y="355" class="text">ResNetInferNode</text>
+  <rect x="300" y="320" width="200" height="40" rx="5" class="box cpu-box" />
+  <text x="400" y="340" class="text">PreprocessNode</text>
 
-  <rect x="535" y="335" width="170" height="40" rx="5" class="box cpu-box" />
-  <text x="620" y="355" class="text">PostprocessNode</text>
+  <rect x="300" y="390" width="200" height="40" rx="5" class="box npu-box" />
+  <text x="400" y="410" class="text">InferNode</text>
 
-  <rect x="315" y="455" width="170" height="40" rx="5" class="box npu-box" />
-  <text x="400" y="475" class="text">AtlasContext</text>
+  <rect x="300" y="460" width="200" height="40" rx="5" class="box cpu-box" />
+  <text x="400" y="480" class="text">PostprocessNode</text>
 
-  <rect x="535" y="455" width="170" height="40" rx="5" class="box add-box" />
-  <text x="620" y="475" class="text">ResNetResultConsumer</text>
+  <rect x="300" y="530" width="200" height="40" rx="5" class="box cpu-box" />
+  <text x="400" y="550" class="text">OutputNode</text>
 
-  <ellipse cx="620" cy="585" rx="60" ry="25" class="box input-output" />
-  <text x="620" y="585" class="text">Output</text>
+  <rect x="560" y="390" width="170" height="40" rx="5" class="box npu-box" />
+  <text x="645" y="410" class="text">AclInferContext x2</text>
 
-  <path d="M400,80 L400,135" class="line" />
-  <text x="417" y="110" class="label-text">source</text>
+  <rect x="560" y="530" width="170" height="40" rx="5" class="box consumer-box" />
+  <text x="645" y="550" class="text">ResNetResultConsumer</text>
 
-  <path d="M400,175 L400,225" class="line" />
-  <text x="417" y="200" class="label-text">packet</text>
+  <ellipse cx="645" cy="650" rx="60" ry="25" class="box input-output" />
+  <text x="645" y="650" class="text">Output</text>
 
-  <path d="M400,265 L180,335" class="line" />
-  <text x="265" y="295" class="label-text">preprocess</text>
+  <path d="M400,75 L400,110" class="line" />
+  <text x="415" y="95" class="label-text">source</text>
 
-  <path d="M265,355 L315,355" class="line" />
+  <path d="M400,150 L400,180" class="line" />
+  <text x="415" y="168" class="label-text">packet</text>
 
-  <path d="M485,355 L535,355" class="line" />
+  <path d="M400,220 L400,250" class="line" />
+  <path d="M400,290 L400,320" class="line" />
+  <path d="M400,360 L400,390" class="line" />
+  <path d="M400,430 L400,460" class="line" />
+  <path d="M400,500 L400,530" class="line" />
+  <path d="M560,410 L500,410" class="line" />
+  <text x="520" y="392" class="label-text">npu</text>
 
-  <path d="M400,455 L400,375" class="line" />
-  <text x="308" y="420" class="label-text">context</text>
+  <path d="M500,550 L560,550" class="line" />
+  <text x="514" y="532" class="label-text">consume</text>
 
-  <path d="M620,375 L620,455" class="line" />
-  <text x="640" y="415" class="label-text">consumer</text>
-
-  <path d="M620,495 L620,560" class="line" />
+  <path d="M645,570 L645,625" class="line" />
 </svg>
