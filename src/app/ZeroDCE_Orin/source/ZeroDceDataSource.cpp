@@ -20,7 +20,15 @@ bool IsImageFile(const fs::path& path) {
         return static_cast<char>(std::tolower(c));
     });
 
-    return ext == ".jpg" || ext == ".jpeg" || ext == ".png";
+    return ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".bmp";
+}
+
+void LogFilesystemWarning(const fs::path& root,
+                          const std::error_code& ec) {
+    if (ec) {
+        std::cerr << "[Source] 跳过无法访问的路径 (" << root.string()
+                  << "): " << ec.message() << std::endl;
+    }
 }
 
 }  // namespace
@@ -51,11 +59,24 @@ ZeroDceDataSource::ZeroDceDataSource(const std::string& input_dir,
         throw std::runtime_error("ZeroDCE input_dir does not exist or is not a directory: " + input_dir);
     }
 
-    for (const auto& entry : fs::recursive_directory_iterator(input_root_)) {
-        if (!entry.is_regular_file() || !IsImageFile(entry.path())) {
+    std::error_code input_iter_ec;
+    for (fs::recursive_directory_iterator it(
+             input_root_, fs::directory_options::skip_permission_denied, input_iter_ec),
+         end;
+         it != end;
+         it.increment(input_iter_ec)) {
+        LogFilesystemWarning(input_root_, input_iter_ec);
+        input_iter_ec.clear();
+
+        std::error_code status_ec;
+        if (!it->is_regular_file(status_ec)) {
+            LogFilesystemWarning(it->path(), status_ec);
             continue;
         }
-        image_paths_.push_back(entry.path().string());
+        if (!IsImageFile(it->path())) {
+            continue;
+        }
+        image_paths_.push_back(it->path().string());
     }
 
     if (!gt_dir.empty()) {
@@ -63,14 +84,27 @@ ZeroDceDataSource::ZeroDceDataSource(const std::string& input_dir,
             throw std::runtime_error("ZeroDCE gt_dir does not exist or is not a directory: " + gt_dir);
         }
 
-        for (const auto& entry : fs::recursive_directory_iterator(gt_root_)) {
-            if (!entry.is_regular_file() || !IsImageFile(entry.path())) {
+        std::error_code gt_iter_ec;
+        for (fs::recursive_directory_iterator it(
+                 gt_root_, fs::directory_options::skip_permission_denied, gt_iter_ec),
+             end;
+             it != end;
+             it.increment(gt_iter_ec)) {
+            LogFilesystemWarning(gt_root_, gt_iter_ec);
+            gt_iter_ec.clear();
+
+            std::error_code status_ec;
+            if (!it->is_regular_file(status_ec)) {
+                LogFilesystemWarning(it->path(), status_ec);
+                continue;
+            }
+            if (!IsImageFile(it->path())) {
                 continue;
             }
 
-            const std::string relative_path = fs::relative(entry.path(), gt_root_).generic_string();
-            gt_by_relative_path_[relative_path] = entry.path().string();
-            gt_by_filename_[entry.path().filename().string()] = entry.path().string();
+            const std::string relative_path = fs::relative(it->path(), gt_root_).generic_string();
+            gt_by_relative_path_[relative_path] = it->path().string();
+            gt_by_filename_[it->path().filename().string()] = it->path().string();
         }
     }
 

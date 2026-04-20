@@ -1,65 +1,65 @@
-<svg width="800" height="720" viewBox="0 0 800 720" xmlns="http://www.w3.org/2000/svg">
+<svg width="800" height="760" viewBox="0 0 800 760" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
       <polygon points="0 0, 10 3.5, 0 7" fill="#555" />
     </marker>
     <style>
       .text { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; text-anchor: middle; dominant-baseline: middle; font-weight: bold; }
-      .label-text { font-family: 'Consolas', monospace; font-size: 16px; fill: #E64A19; font-weight: 900; }
+      .label-text { font-family: 'Consolas', monospace; font-size: 15px; fill: #E64A19; font-weight: 700; }
       .box { stroke-width: 2; }
       .input-output { fill: #fce4ec; stroke: #880e4f; }
-      .npu-box { fill: #e3f2fd; stroke: #1565c0; }
       .cpu-box { fill: #ccff90; stroke: #388e3c; }
-      .add-box { fill: #fff8e1; stroke: #f9a825; }
+      .npu-box { fill: #e3f2fd; stroke: #1565c0; }
+      .meta-box { fill: #fff8e1; stroke: #f9a825; }
       .line { fill: none; stroke: #555; stroke-width: 1.5; marker-end: url(#arrowhead); }
     </style>
   </defs>
 
-  <ellipse cx="400" cy="55" rx="60" ry="25" class="box input-output" />
-  <text x="400" y="55" class="text">Input</text>
+  <ellipse cx="400" cy="60" rx="62" ry="24" class="box input-output" />
+  <text x="400" y="60" class="text">Input Dir</text>
 
-  <rect x="300" y="135" width="200" height="40" rx="5" class="box cpu-box" />
-  <text x="400" y="155" class="text">ZeroDceDataSource</text>
+  <rect x="305" y="120" width="190" height="46" rx="6" class="box cpu-box" />
+  <text x="400" y="143" class="text">ZeroDceDataSource</text>
 
-  <rect x="300" y="225" width="200" height="40" rx="5" class="box add-box" />
-  <text x="400" y="245" class="text">ZeroDcePacket</text>
+  <rect x="320" y="215" width="160" height="46" rx="6" class="box meta-box" />
+  <text x="400" y="238" class="text">ZeroDcePacket</text>
 
-  <rect x="95" y="335" width="170" height="40" rx="5" class="box cpu-box" />
-  <text x="180" y="355" class="text">PreprocessNode</text>
+  <rect x="315" y="310" width="170" height="46" rx="6" class="box cpu-box" />
+  <text x="400" y="333" class="text">PreprocessNode</text>
 
-  <rect x="315" y="335" width="170" height="40" rx="5" class="box npu-box" />
-  <text x="400" y="355" class="text">InferNode</text>
+  <rect x="325" y="405" width="150" height="46" rx="6" class="box npu-box" />
+  <text x="400" y="428" class="text">InferNode</text>
 
-  <rect x="535" y="335" width="170" height="40" rx="5" class="box cpu-box" />
-  <text x="620" y="355" class="text">PostprocessNode</text>
+  <rect x="325" y="520" width="150" height="46" rx="6" class="box npu-box" />
+  <text x="400" y="543" class="text">OrinContext</text>
 
-  <rect x="315" y="455" width="170" height="40" rx="5" class="box npu-box" />
-  <text x="400" y="475" class="text">AtlasContext</text>
+  <rect x="305" y="615" width="190" height="46" rx="6" class="box cpu-box" />
+  <text x="400" y="638" class="text">PostprocessNode</text>
 
-  <rect x="535" y="455" width="170" height="40" rx="5" class="box add-box" />
-  <text x="620" y="475" class="text">ZeroDceResultConsumer</text>
+  <rect x="540" y="615" width="190" height="46" rx="6" class="box meta-box" />
+  <text x="635" y="638" class="text">ZeroDceResultConsumer</text>
 
-  <ellipse cx="620" cy="585" rx="60" ry="25" class="box input-output" />
-  <text x="620" y="585" class="text">Output</text>
+  <ellipse cx="635" cy="715" rx="58" ry="24" class="box input-output" />
+  <text x="635" y="715" class="text">Output</text>
 
-  <path d="M400,80 L400,135" class="line" />
-  <text x="417" y="110" class="label-text">source</text>
+  <path d="M400,84 L400,120" class="line" />
+  <text x="425" y="103" class="label-text">images</text>
 
-  <path d="M400,175 L400,225" class="line" />
-  <text x="417" y="200" class="label-text">packet</text>
+  <path d="M400,166 L400,215" class="line" />
+  <text x="427" y="191" class="label-text">packets</text>
 
-  <path d="M400,265 L180,335" class="line" />
-  <text x="265" y="295" class="label-text">preprocess</text>
+  <path d="M400,261 L400,310" class="line" />
+  <text x="442" y="286" class="label-text">preprocess</text>
 
-  <path d="M265,355 L315,355" class="line" />
+  <path d="M400,356 L400,405" class="line" />
 
-  <path d="M485,355 L535,355" class="line" />
+  <path d="M400,520 L400,451" class="line" />
+  <text x="425" y="485" class="label-text">orin_trt</text>
 
-  <path d="M400,455 L400,375" class="line" />
-  <text x="308" y="420" class="label-text">context</text>
+  <path d="M400,566 L400,615" class="line" />
 
-  <path d="M620,375 L620,455" class="line" />
-  <text x="640" y="415" class="label-text">consumer</text>
+  <path d="M495,638 L540,638" class="line" />
+  <text x="517" y="620" class="label-text">consume</text>
 
-  <path d="M620,495 L620,560" class="line" />
+  <path d="M635,661 L635,691" class="line" />
 </svg>

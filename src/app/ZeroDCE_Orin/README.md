@@ -2,10 +2,19 @@
 
 `ZeroDCE_Orin` 是把原先的 Atlas 示例骨架替换为 Jetson Orin + TensorRT 的最小可运行版本。
 
+当前 DAG 可参考 `assets/chart.svg`：
+
+- `Input Dir -> ZeroDceDataSource -> ZeroDcePacket`
+- `PreprocessNode -> InferNode -> PostprocessNode`
+- `InferNode` 通过资源类型 `orin_trt` 从 `ResourcePool` 获取 `OrinContext`
+- `PostprocessNode -> ZeroDceResultConsumer -> Output`
+
 当前实现假设：
 
 - 输入模型为 TensorRT `.engine`
 - 输入输出 tensor 都是 `NCHW`
+- 输入输出 tensor 都要求为 `FP32`
+- 当前只接受单输入、单输出 TensorRT engine
 - 当前只支持 `batch=1`
 - 当前只支持 `3` 通道输入输出
 - 输出 tensor 空间尺寸与输入一致
@@ -34,6 +43,7 @@
 - 传 `--infer-only` 时，会进一步跳过输出 tensor 转图片，最接近纯推理吞吐
 - 运行结束会额外打印 `Preprocess / Infer / Postprocess` 三段平均耗时
 - 有 `gt_dir` 时显示真实 `PSNR`，没有 `gt_dir` 时显示 `Proxy PSNR`
+- 运行时输入图片支持 `jpg/jpeg/png/bmp`，与 `scripts/build_int8_engine.py` 的量化数据扫描范围保持一致
 
 建议测速命令：
 

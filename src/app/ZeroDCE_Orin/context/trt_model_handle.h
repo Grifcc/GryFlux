@@ -126,7 +126,17 @@ private:
             [](size_t acc, int dim) { return acc * static_cast<size_t>(dim); });
     }
 
+    void RequireFloatTensor(const std::string& tensor_name) const {
+        if (engine_->getTensorDataType(tensor_name.c_str()) != nvinfer1::DataType::kFLOAT) {
+            throw std::runtime_error(
+                "ZeroDCE_Orin expects FP32 TensorRT input/output tensors");
+        }
+    }
+
     void ResolveTensorMetadata() {
+        int input_count = 0;
+        int output_count = 0;
+
         for (int i = 0; i < engine_->getNbIOTensors(); ++i) {
             const char* tensor_name = engine_->getIOTensorName(i);
             if (tensor_name == nullptr) {
@@ -135,17 +145,23 @@ private:
 
             const auto mode = engine_->getTensorIOMode(tensor_name);
             if (mode == nvinfer1::TensorIOMode::kINPUT) {
+                ++input_count;
                 input_tensor_name_ = tensor_name;
                 input_dims_ = NormalizeDims(engine_->getTensorShape(tensor_name));
             } else if (mode == nvinfer1::TensorIOMode::kOUTPUT) {
+                ++output_count;
                 output_tensor_name_ = tensor_name;
                 output_dims_ = NormalizeDims(engine_->getTensorShape(tensor_name));
             }
         }
 
-        if (input_tensor_name_.empty() || output_tensor_name_.empty()) {
-            throw std::runtime_error("Failed to resolve ZeroDCE TensorRT input/output tensors");
+        if (input_count != 1 || output_count != 1) {
+            throw std::runtime_error(
+                "ZeroDCE_Orin expects exactly one TensorRT input tensor and one output tensor");
         }
+
+        RequireFloatTensor(input_tensor_name_);
+        RequireFloatTensor(output_tensor_name_);
 
         input_element_count_ = ElementCount(input_dims_);
         output_element_count_ = ElementCount(output_dims_);

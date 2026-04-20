@@ -2,7 +2,6 @@
 #include <iostream>
 #include <memory>
 #include <string>
-#include <thread>
 #include <vector>
 
 #include <opencv2/opencv.hpp>
@@ -148,29 +147,10 @@ int RunApp(const AppConfig& config) {
         kThreadPoolSize,
         kMaxActivePackets);
 
-    auto finish_signal = consumer->get_future();
-    std::exception_ptr pipeline_error;
-    std::thread pipeline_thread([&]() {
-        try {
-            pipeline.run();
-        } catch (...) {
-            pipeline_error = std::current_exception();
-            consumer->signalFailure();
-        }
-    });
-
-    finish_signal.wait();
-
-    if (pipeline_thread.joinable()) {
-        pipeline_thread.join();
-    }
+    pipeline.run();
 
     if (config.enable_save) {
         AsyncDiskWriter::GetInstance().Stop();
-    }
-
-    if (pipeline_error) {
-        std::rethrow_exception(pipeline_error);
     }
 
     consumer->printMetrics();

@@ -18,7 +18,7 @@ public:
                           bool infer_only);
     ~ZeroDceResultConsumer() override = default;
 
-    std::future<void> get_future() { return finish_promise_.get_future(); }
+    std::shared_future<void> get_future() const { return finish_future_; }
     void consume(std::unique_ptr<GryFlux::DataPacket> packet) override;
     void printMetrics();
     void signalFailure();
@@ -43,6 +43,7 @@ private:
     std::atomic<size_t> completed_frames_{0};
     std::atomic<size_t> skipped_frames_{0};
     std::promise<void> finish_promise_;
+    std::shared_future<void> finish_future_;
     std::atomic<bool> finish_signaled_{false};
     std::chrono::time_point<std::chrono::high_resolution_clock> start_time_;
     bool has_ground_truth_ = false;

@@ -82,17 +82,17 @@ void PostprocessNode::execute(GryFlux::DataPacket& packet, GryFlux::Context& ctx
     }
 
     const int image_area = dce_packet.output_width * dce_packet.output_height;
-    const float* channel_r = dce_packet.output_tensor.data();
-    const float* channel_g = channel_r + image_area;
-    const float* channel_b = channel_g + image_area;
+    float* channel_r = dce_packet.output_tensor.data();
+    float* channel_g = channel_r + image_area;
+    float* channel_b = channel_g + image_area;
     std::vector<cv::Mat> bgr_channels;
     bgr_channels.reserve(3);
     bgr_channels.emplace_back(
-        dce_packet.output_height, dce_packet.output_width, CV_32FC1, const_cast<float*>(channel_b));
+        dce_packet.output_height, dce_packet.output_width, CV_32FC1, channel_b);
     bgr_channels.emplace_back(
-        dce_packet.output_height, dce_packet.output_width, CV_32FC1, const_cast<float*>(channel_g));
+        dce_packet.output_height, dce_packet.output_width, CV_32FC1, channel_g);
     bgr_channels.emplace_back(
-        dce_packet.output_height, dce_packet.output_width, CV_32FC1, const_cast<float*>(channel_r));
+        dce_packet.output_height, dce_packet.output_width, CV_32FC1, channel_r);
 
     cv::Mat enhanced_bgr_float;
     cv::merge(bgr_channels, enhanced_bgr_float);

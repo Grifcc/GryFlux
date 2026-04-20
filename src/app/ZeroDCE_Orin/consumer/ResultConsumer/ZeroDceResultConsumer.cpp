@@ -10,6 +10,7 @@ ZeroDceResultConsumer::ZeroDceResultConsumer(size_t total_frames,
                                              bool enable_metrics,
                                              bool infer_only)
     : total_frames_(total_frames),
+      finish_future_(finish_promise_.get_future().share()),
       has_ground_truth_(has_ground_truth),
       enable_metrics_(enable_metrics),
       infer_only_(infer_only) {
