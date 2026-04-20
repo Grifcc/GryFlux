@@ -1,8 +1,14 @@
 #include <iostream>
+#include <memory>
 #include <string>
-#include "acl/acl.h"
+#include <vector>
+
 #include "framework/async_pipeline.h"
+#include "framework/graph_template.h"
+#include "framework/profiler/profiling_build_config.h"
+#include "framework/resource_pool.h"
 #include "framework/template_builder.h"
+
 #include "packet/ZeroDce_Packet.h"
 #include "source/ZeroDceDataSource.h" 
 #include "consumer/ResultConsumer/ZeroDceResultConsumer.h"
@@ -34,11 +40,6 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (aclInit(nullptr) != ACL_SUCCESS) {
-        std::cerr << "ACL 初始化失败！" << std::endl;
-        return 1;
-    }
-
     std::cout << "[INFO] 开始初始化 ZeroDCE 流水线。" << std::endl;
 
     auto consumer = std::make_shared<ZeroDceResultConsumer>(source->GetTotalFrames());
@@ -46,8 +47,14 @@ int main(int argc, char* argv[]) {
     auto resourcePool = std::make_shared<GryFlux::ResourcePool>();
     std::vector<std::shared_ptr<GryFlux::Context>> atlas_contexts;
 
-    atlas_contexts.push_back(std::make_shared<AtlasContext>(0, omModelPath));
-    atlas_contexts.push_back(std::make_shared<AtlasContext>(1, omModelPath)); 
+    auto device0_contexts = CreateAtlasContexts(omModelPath, 0, 1);
+    auto device1_contexts = CreateAtlasContexts(omModelPath, 1, 1);
+    atlas_contexts.insert(atlas_contexts.end(),
+                          device0_contexts.begin(),
+                          device0_contexts.end());
+    atlas_contexts.insert(atlas_contexts.end(),
+                          device1_contexts.begin(),
+                          device1_contexts.end());
     
     resourcePool->registerResourceType("atlas_npu", std::move(atlas_contexts));
 
@@ -86,13 +93,5 @@ int main(int argc, char* argv[]) {
 
     AsyncDiskWriter::GetInstance().Stop();
 
-    if constexpr (GryFlux::Profiling::kBuildProfiling) {
-        pipeline.printProfilingStats();
-        pipeline.dumpProfilingTimeline("graph_timeline_zero_dce.json");
-    }
-
-    aclFinalize();
-    std::cout << "[INFO] ACL 资源已释放，程序结束。" << std::endl;
-    
     return 0;
 }

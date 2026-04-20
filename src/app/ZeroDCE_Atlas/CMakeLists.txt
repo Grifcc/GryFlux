@@ -2,7 +2,8 @@
 set(ZERODCE_SRC
     ZeroDCE_Atlas.cpp
     source/ZeroDceDataSource.cpp
-    context/AtlasContext.cpp                         
+    context/AtlasContext.cpp
+    context/acl_environment.cpp
     consumer/ResultConsumer/ZeroDceResultConsumer.cpp 
     consumer/DiskWriter/AsyncDiskWriter.cpp         
     nodes/Input/InputNode.cpp

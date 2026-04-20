@@ -1,24 +1,75 @@
 #pragma once
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
 #include <string>
-#include <stdexcept>
+#include <vector>
+
 #include "framework/context.h"
 #include "acl/acl.h"
+#include "acl/acl_mdl.h"
 
 class AtlasContext : public GryFlux::Context {
 public:
-    AtlasContext(int device_id, const std::string& model_path);
-    
-    ~AtlasContext();
+    struct Config {
+        std::string model_path;
+        int device_id = 0;
+    };
 
-    aclrtContext GetAclContext() const { return context_; }
-    uint32_t GetModelId() const { return model_id_; }
-    aclmdlDesc* GetModelDesc() const { return model_desc_; }
+    explicit AtlasContext(Config config);
+    ~AtlasContext() override;
+
+    bool init(std::string* error);
+
+    const Config& config() const { return config_; }
+    int getDeviceId() const { return device_id_; }
+
+    size_t getNumInputs() const { return input_buffers_.size(); }
+    size_t getInputBufferSize(size_t index) const;
+    size_t getInputBufferSize() const;
+
+    void copyToDevice(const void* host_data, size_t size);
+    void copyToDevice(size_t input_index, const void* host_data, size_t size);
+    void executeModel();
+    void copyToHost();
+    void copyToHost(size_t output_index, void* host_buffer, size_t size);
+
+    size_t getNumOutputs() const { return output_buffers_.size(); }
+    void* getOutputHostBuffer(size_t index) const;
+    size_t getOutputSize(size_t index) const;
 
 private:
-    void cleanup() noexcept;
+    struct ModelInput {
+        void* device_buffer = nullptr;
+        size_t size = 0;
+    };
 
-    int device_id_;
-    aclrtContext context_ = nullptr;
+    struct ModelOutput {
+        void* device_buffer = nullptr;
+        void* host_buffer = nullptr;
+        size_t size = 0;
+    };
+
+    void destroyDatasets() noexcept;
+    void destroyBuffers() noexcept;
+    void unloadModel() noexcept;
+
+    Config config_;
+    bool initialized_ = false;
+    int device_id_ = 0;
+
     uint32_t model_id_ = 0;
     aclmdlDesc* model_desc_ = nullptr;
+
+    std::vector<ModelInput> input_buffers_;
+    aclmdlDataset* input_dataset_ = nullptr;
+
+    std::vector<ModelOutput> output_buffers_;
+    aclmdlDataset* output_dataset_ = nullptr;
 };
+
+std::vector<std::shared_ptr<GryFlux::Context>> CreateAtlasContexts(
+    const std::string& om_model_path,
+    int device_id,
+    size_t instance_count);
