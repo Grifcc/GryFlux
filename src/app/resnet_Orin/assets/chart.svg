@@ -1,0 +1,64 @@
+<svg width="800" height="620" viewBox="0 0 800 620" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#555" />
+    </marker>
+    <style>
+      .text { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; text-anchor: middle; dominant-baseline: middle; font-weight: bold; }
+      .label-text { font-family: 'Consolas', monospace; font-size: 16px; fill: #E64A19; font-weight: 900; }
+      .box { stroke-width: 2; }
+      .input-output { fill: #fce4ec; stroke: #880e4f; }
+      .mul-box { fill: #e3f2fd; stroke: #1565c0; }
+      .add-box { fill: #fff8e1; stroke: #f9a825; }
+      .cpu-box { fill: #ccff90; stroke: #388e3c; }
+      .line { fill: none; stroke: #555; stroke-width: 1.5; marker-end: url(#arrowhead); }
+    </style>
+  </defs>
+
+  <!-- Level 0: Input -->
+  <ellipse cx="400" cy="55" rx="78" ry="25" class="box input-output" />
+  <text x="400" y="55" class="text">Input Args</text>
+
+  <!-- Level 1: Source -->
+  <rect x="315" y="130" width="170" height="40" rx="5" class="box cpu-box" />
+  <text x="400" y="150" class="text">ResNetDataSource</text>
+
+  <!-- Level 2: Preprocess -->
+  <rect x="315" y="230" width="170" height="40" rx="5" class="box cpu-box" />
+  <text x="400" y="250" class="text">PreprocessNode</text>
+
+  <!-- Level 3: Inference + Resource -->
+  <rect x="315" y="330" width="170" height="40" rx="5" class="box mul-box" />
+  <text x="400" y="350" class="text">ResNetInferNode</text>
+
+  <rect x="555" y="330" width="150" height="40" rx="5" class="box add-box" />
+  <text x="630" y="350" class="text">OrinContext x2</text>
+
+  <!-- Level 4: Postprocess -->
+  <rect x="315" y="430" width="170" height="40" rx="5" class="box cpu-box" />
+  <text x="400" y="450" class="text">PostprocessNode</text>
+
+  <!-- Level 5: Output -->
+  <ellipse cx="400" cy="550" rx="110" ry="25" class="box input-output" />
+  <text x="400" y="550" class="text">ResNetResultConsumer</text>
+
+  <!-- Main flow -->
+  <path d="M400,80 L400,130" class="line" />
+  <text x="455" y="106" class="label-text">args</text>
+
+  <path d="M400,170 L400,230" class="line" />
+  <text x="467" y="200" class="label-text">packet</text>
+
+  <path d="M400,270 L400,330" class="line" />
+  <text x="466" y="300" class="label-text">tensor</text>
+
+  <path d="M400,370 L400,430" class="line" />
+  <text x="466" y="400" class="label-text">logits</text>
+
+  <path d="M400,470 L400,525" class="line" />
+  <text x="468" y="498" class="label-text">result</text>
+
+  <!-- Resource binding -->
+  <path d="M555,350 L485,350" class="line" />
+  <text x="520" y="325" class="label-text">atlas_npu</text>
+</svg>
