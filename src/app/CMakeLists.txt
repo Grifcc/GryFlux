@@ -1,1 +1,3 @@
 add_subdirectory(example)
+add_subdirectory(segmentation_deeplab_ascend)
+add_subdirectory(super-resolution_realesrgan_Ascend)

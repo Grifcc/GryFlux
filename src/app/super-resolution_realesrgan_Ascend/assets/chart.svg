@@ -1,0 +1,52 @@
+<svg width="1320" height="260" viewBox="0 0 1320 260" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#555"/>
+    </marker>
+    <style>
+      .title { font: bold 22px 'Segoe UI', Arial, sans-serif; fill: #263238; }
+      .node { stroke-width: 2; }
+      .io { fill: #fce4ec; stroke: #880e4f; }
+      .cpu { fill: #ccff90; stroke: #388e3c; }
+      .npu { fill: #ffcdd2; stroke: #c62828; }
+      .text { font: bold 14px 'Segoe UI', Arial, sans-serif; fill: #263238; text-anchor: middle; dominant-baseline: middle; }
+      .sub { font: 13px Consolas, monospace; fill: #455a64; text-anchor: middle; dominant-baseline: middle; }
+      .edge { stroke: #555; stroke-width: 1.8; fill: none; marker-end: url(#arrow); }
+      .label { font: bold 14px Consolas, monospace; fill: #e64a19; text-anchor: middle; }
+    </style>
+  </defs>
+
+  <text x="660" y="30" text-anchor="middle" class="title">RealESRGAN Super-Resolution DAG</text>
+
+  <ellipse cx="100" cy="150" rx="72" ry="28" class="node io"/>
+  <text x="100" y="142" class="text">Input</text>
+  <text x="100" y="162" class="sub">LR 256x256</text>
+
+  <rect x="210" y="122" width="170" height="56" rx="8" class="node cpu"/>
+  <text x="295" y="142" class="text">Preprocess</text>
+  <text x="295" y="162" class="sub">RGB / Normalize</text>
+
+  <rect x="450" y="122" width="210" height="56" rx="8" class="node npu"/>
+  <text x="555" y="142" class="text">Inference (NPU)</text>
+  <text x="555" y="162" class="sub">realesrgan_int8.om</text>
+
+  <rect x="730" y="122" width="170" height="56" rx="8" class="node cpu"/>
+  <text x="815" y="142" class="text">Postprocess</text>
+  <text x="815" y="162" class="sub">Tensor to BGR Image</text>
+
+  <ellipse cx="1040" cy="150" rx="72" ry="28" class="node io"/>
+  <text x="1040" y="142" class="text">Output</text>
+  <text x="1040" y="162" class="sub">Saved SR Image</text>
+
+  <line x1="172" y1="150" x2="210" y2="150" class="edge"/>
+  <text x="191" y="112" class="label">BGR Frame</text>
+
+  <line x1="380" y1="150" x2="450" y2="150" class="edge"/>
+  <text x="415" y="112" class="label">Input Tensor</text>
+
+  <line x1="660" y1="150" x2="730" y2="150" class="edge"/>
+  <text x="695" y="112" class="label">x4 SR Tensor</text>
+
+  <line x1="900" y1="150" x2="968" y2="150" class="edge"/>
+  <text x="934" y="112" class="label">SR Image</text>
+</svg>
