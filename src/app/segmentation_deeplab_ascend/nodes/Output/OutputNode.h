@@ -3,9 +3,13 @@
 #include "framework/node_base.h"
 
 #include <filesystem>
-#include <limits>
 #include <mutex>
 #include <string>
+
+namespace cv
+{
+class Mat;
+}
 
 namespace PipelineNodes
 {
@@ -13,13 +17,16 @@ namespace PipelineNodes
 class OutputNode : public GryFlux::NodeBase
 {
 public:
-    explicit OutputNode(
-        std::string outputDir = "realesrgan_outputs",
-        size_t maxSavedImages = std::numeric_limits<size_t>::max());
+    explicit OutputNode(std::string outputDir = "deeplab_outputs",
+                        size_t maxSavedImages = 10);
 
     void execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx) override;
 
 private:
+    std::string saveOverlayImage(const cv::Mat &overlayImage,
+                                 const std::string &imagePath,
+                                 int frameId);
+
     std::filesystem::path buildOutputPath(const std::string &imagePath, int frameId) const;
 
     std::filesystem::path outputDir_;

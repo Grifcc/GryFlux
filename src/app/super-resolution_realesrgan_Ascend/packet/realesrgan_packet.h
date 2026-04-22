@@ -6,7 +6,6 @@
 
 #include <opencv2/opencv.hpp>
 
-#include <limits>
 #include <string>
 #include <cstdint>
 #include <vector>
@@ -22,13 +21,11 @@ struct RealEsrganPacket : public GryFlux::DataPacket
 {
     int frame_id = 0;
     std::string lr_path;
-    std::string hr_path;
 
     int lr_w = 0;
     int lr_h = 0;
 
     cv::Mat lr_image;
-    cv::Mat hr_image;
     cv::Mat sr_image;
 
     std::vector<float> input_tensor;
@@ -36,8 +33,6 @@ struct RealEsrganPacket : public GryFlux::DataPacket
     aclmdlIODims output_dims{};
     aclFormat output_format = ACL_FORMAT_UNDEFINED;
     aclDataType output_data_type = ACL_DT_UNDEFINED;
-    double psnr = std::numeric_limits<double>::quiet_NaN();
-    bool has_valid_psnr = false;
 
     RealEsrganPacket()
         : input_tensor(REALESRGAN_NUM_CHANNELS * REALESRGAN_INPUT_H * REALESRGAN_INPUT_W)

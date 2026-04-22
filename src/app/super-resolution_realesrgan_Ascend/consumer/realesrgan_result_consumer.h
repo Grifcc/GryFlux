@@ -3,7 +3,6 @@
 #include "framework/data_consumer.h"
 
 #include <atomic>
-#include <mutex>
 
 class RealEsrganResultConsumer : public GryFlux::DataConsumer
 {
@@ -17,8 +16,5 @@ public:
 
 private:
     size_t expectedTotal_;
-    mutable std::mutex mutex_;
     std::atomic<size_t> consumedCount_{0};
-    size_t validPsnrCount_ = 0;
-    double totalPsnr_ = 0.0;
 };

@@ -1,6 +1,6 @@
 #include "InferenceNode.h"
 
-#include "context/realesrgan_npu_context.h"
+#include "context/infercontext.h"
 #include "packet/realesrgan_packet.h"
 #include "utils/logger.h"
 
@@ -13,54 +13,41 @@ namespace PipelineNodes
 void InferenceNode::execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx)
 {
     auto &p = static_cast<RealEsrganPacket &>(packet);
-    auto &npu = static_cast<RealEsrganNPUContext &>(ctx);
+    auto &npu = static_cast<InferContext &>(ctx);
 
     if (p.lr_image.empty())
     {
         throw std::runtime_error("InferenceNode: lr_image is empty.");
     }
 
-    npu.bindToCurrentThread();
-
     const size_t inputBytes = p.input_tensor.size() * sizeof(float);
-    if (inputBytes > npu.getInputSize())
+    if (inputBytes != npu.getInputBufferSize())
     {
-        throw std::runtime_error("InferenceNode: input_tensor size exceeds model input buffer.");
+        throw std::runtime_error("InferenceNode: input_tensor size does not match model input buffer.");
     }
 
-    p.output_buffer.resize(npu.getOutputSize());
+    if (npu.getNumOutputs() == 0)
+    {
+        throw std::runtime_error("InferenceNode: model has no outputs.");
+    }
 
-    CHECK_ACL(
-        aclrtMemcpy(
-            npu.getDevBufIn(),
-            npu.getInputSize(),
-            p.input_tensor.data(),
-            inputBytes,
-            ACL_MEMCPY_HOST_TO_DEVICE),
-        "InferenceNode memcpy input");
+    npu.copyToDevice(p.input_tensor.data(), inputBytes);
+    npu.executeModel();
+    npu.copyToHost();
 
-    CHECK_ACL(
-        aclmdlExecute(
-            npu.getModelId(),
-            npu.getInputDataset(),
-            npu.getOutputDataset()),
-        "InferenceNode aclmdlExecute");
+    const size_t outputBytes = npu.getOutputSize(0);
+    p.output_buffer.resize(outputBytes);
 
-    npu.refreshCurrentOutputDims();
-    p.output_dims = npu.getCurrentOutputDims();
-    p.output_format = npu.getOutputFormat();
-    p.output_data_type = npu.getOutputDataType();
+    std::memcpy(
+        p.output_buffer.data(),
+        npu.getOutputHostBuffer(0),
+        outputBytes);
 
-    CHECK_ACL(
-        aclrtMemcpy(
-            p.output_buffer.data(),
-            p.output_buffer.size(),
-            npu.getDevBufOut(),
-            npu.getOutputSize(),
-            ACL_MEMCPY_DEVICE_TO_HOST),
-        "InferenceNode memcpy output");
+    p.output_dims = npu.getOutputDims(0);
+    p.output_format = npu.getOutputFormat(0);
+    p.output_data_type = npu.getOutputDataType(0);
 
-    LOG.debug("Packet %d: inference done on device %d", p.frame_id, npu.getDeviceId());
+    LOG.debug("Packet %d: inference done", p.frame_id);
 }
 
 } // namespace PipelineNodes

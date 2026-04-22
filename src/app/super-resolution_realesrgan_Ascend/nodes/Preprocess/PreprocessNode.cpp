@@ -5,7 +5,6 @@
 
 #include <chrono>
 #include <cstring>
-#include <filesystem>
 #include <stdexcept>
 #include <thread>
 
@@ -26,11 +25,6 @@ void PreprocessNode::execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx)
     p.lr_w = p.lr_image.cols;
     p.lr_h = p.lr_image.rows;
 
-    if (!p.hr_path.empty() && std::filesystem::exists(p.hr_path))
-    {
-        p.hr_image = cv::imread(p.hr_path, cv::IMREAD_COLOR);
-    }
-
     cv::Mat resized;
     cv::resize(
         p.lr_image,
@@ -45,6 +39,11 @@ void PreprocessNode::execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx)
     rgbFloat.convertTo(rgbFloat, CV_32FC3, 1.0 / 255.0);
 
     const size_t planeSize = static_cast<size_t>(REALESRGAN_INPUT_W * REALESRGAN_INPUT_H);
+    if (p.input_tensor.size() != static_cast<size_t>(REALESRGAN_NUM_CHANNELS * REALESRGAN_INPUT_W * REALESRGAN_INPUT_H))
+    {
+        p.input_tensor.resize(REALESRGAN_NUM_CHANNELS * REALESRGAN_INPUT_W * REALESRGAN_INPUT_H);
+    }
+
     std::vector<cv::Mat> channels(3);
     cv::split(rgbFloat, channels);
     for (int c = 0; c < 3; ++c)

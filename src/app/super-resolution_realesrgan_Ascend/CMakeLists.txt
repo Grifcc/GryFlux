@@ -8,15 +8,19 @@ file(GLOB_RECURSE REALESRGAN_CONSUMER_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/consumer/*.cpp"
 )
 
+file(GLOB_RECURSE REALESRGAN_CONTEXT_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/context/*.cpp"
+)
+
 set(REALESRGAN_MAIN_FILE "")
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/go.cpp")
-    set(REALESRGAN_MAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/go.cpp")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp")
+    set(REALESRGAN_MAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp")
 elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/realesrgan.cpp")
     set(REALESRGAN_MAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/realesrgan.cpp")
 endif()
 
 if(REALESRGAN_MAIN_FILE STREQUAL "")
-    message(STATUS "go.cpp/realesrgan.cpp not found under src/app/super-resolution_realesrgan_Ascend, skip building target 'realesrgan'")
+    message(STATUS "main.cpp/realesrgan.cpp not found under src/app/super-resolution_realesrgan_Ascend, skip building target 'realesrgan'")
     return()
 endif()
 
@@ -63,6 +67,7 @@ add_executable(realesrgan
     ${REALESRGAN_MAIN_FILE}
     ${REALESRGAN_NODE_SOURCES}
     ${REALESRGAN_CONSUMER_SOURCES}
+    ${REALESRGAN_CONTEXT_SOURCES}
     ${SRC_DIR}
 )
 

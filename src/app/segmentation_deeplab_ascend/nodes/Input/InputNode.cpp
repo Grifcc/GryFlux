@@ -27,24 +27,14 @@ void InputNode::execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx)
         throw std::runtime_error("InputNode: image file does not exist: " + p.image_path);
     }
 
-    if (p.gt_path.empty())
-    {
-        std::filesystem::path gtPath = imagePath;
-        gtPath.replace_extension(".png");
-        p.gt_path = gtPath.string();
-    }
-
     p.orig_w = 0;
     p.orig_h = 0;
-    p.miou = 0.0f;
     p.pred_mask_resized.release();
-    p.gt_mask.release();
 
     LOG.debug(
-        "Packet %d: image=%s, gt=%s",
+        "Packet %d: image=%s",
         p.frame_id,
-        p.image_path.c_str(),
-        p.gt_path.c_str());
+        p.image_path.c_str());
 
     std::this_thread::sleep_for(std::chrono::milliseconds(delayMs_));
 }

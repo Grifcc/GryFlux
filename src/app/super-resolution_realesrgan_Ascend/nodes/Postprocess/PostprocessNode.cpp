@@ -1,6 +1,5 @@
 #include "PostprocessNode.h"
 
-#include "context/realesrgan_npu_context.h"
 #include "packet/realesrgan_packet.h"
 #include "utils/logger.h"
 
@@ -131,12 +130,10 @@ TensorShape resolveOutputShape(const aclmdlIODims &dims, aclFormat format, size_
 
 uint8_t toU8FromFloat(float value)
 {
-    if (value <= 1.0f && value >= 0.0f)
-    {
-        value *= 255.0f;
-    }
-    value = std::clamp(value, 0.0f, 255.0f);
-    return static_cast<uint8_t>(std::lround(value));
+    // The standalone ACL runner decodes model outputs as normalized RGB in [0, 1].
+    // Clamp in that domain first, then scale to uint8.
+    value = std::clamp(value, 0.0f, 1.0f);
+    return static_cast<uint8_t>(std::lround(value * 255.0f));
 }
 
 } // namespace

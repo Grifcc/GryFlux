@@ -8,15 +8,19 @@
       "${CMAKE_CURRENT_SOURCE_DIR}/consumer/*.cpp"
   )
 
+  file(GLOB_RECURSE DEEPLAB_CONTEXT_SOURCES CONFIGURE_DEPENDS
+      "${CMAKE_CURRENT_SOURCE_DIR}/context/*.cpp"
+  )
+
   set(DEEPLAB_MAIN_FILE "")
-  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/go.cpp")
-      set(DEEPLAB_MAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/go.cpp")
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp")
+      set(DEEPLAB_MAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp")
   elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deeplab.cpp")
       set(DEEPLAB_MAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/deeplab.cpp")
   endif()
 
   if(DEEPLAB_MAIN_FILE STREQUAL "")
-      message(STATUS "go.cpp/deeplab.cpp not found under src/app/segmentation_deeplab_ascend, skip building target 'deeplab'")
+      message(STATUS "main.cpp/deeplab.cpp not found under src/app/segmentation_deeplab_ascend, skip building target 'deeplab'")
       return()
   endif()
 
@@ -63,6 +67,7 @@
       ${DEEPLAB_MAIN_FILE}
       ${DEEPLAB_NODE_SOURCES}
       ${DEEPLAB_CONSUMER_SOURCES}
+      ${DEEPLAB_CONTEXT_SOURCES}
       ${SRC_DIR}
   )
 

@@ -12,11 +12,10 @@
 class RealEsrganSource : public GryFlux::DataSource
 {
 public:
-    RealEsrganSource(const std::string &lrDir, const std::string &hrDir)
-        : hrDir_(hrDir)
+    explicit RealEsrganSource(const std::string &inputDir)
     {
-        std::cout << "[Source] Scanning low-resolution directory: " << lrDir << std::endl;
-        for (const auto &entry : std::filesystem::directory_iterator(lrDir))
+        std::cout << "[Source] Scanning input directory: " << inputDir << std::endl;
+        for (const auto &entry : std::filesystem::directory_iterator(inputDir))
         {
             if (!entry.is_regular_file())
             {
@@ -45,7 +44,6 @@ public:
         auto packet = std::make_unique<RealEsrganPacket>();
         packet->frame_id = static_cast<int>(currentIdx_);
         packet->lr_path = lrFiles_[currentIdx_].string();
-        packet->hr_path = buildHrPath(lrFiles_[currentIdx_]).string();
 
         ++currentIdx_;
         setHasMore(currentIdx_ < lrFiles_.size());
@@ -58,18 +56,6 @@ public:
     }
 
 private:
-    std::filesystem::path buildHrPath(const std::filesystem::path &lrPath) const
-    {
-        std::string fileName = lrPath.filename().string();
-        const auto pos = fileName.find("_LR");
-        if (pos != std::string::npos)
-        {
-            fileName.replace(pos, 3, "_HR");
-        }
-        return std::filesystem::path(hrDir_) / fileName;
-    }
-
     std::vector<std::filesystem::path> lrFiles_;
-    std::string hrDir_;
     size_t currentIdx_ = 0;
 };

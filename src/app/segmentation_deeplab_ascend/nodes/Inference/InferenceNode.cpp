@@ -1,6 +1,6 @@
 #include "InferenceNode.h"
 
-#include "context/deeplab_npu_Context.h"
+#include "context/infercontext.h"
 #include "packet/deeplab_packet.h"
 #include "utils/logger.h"
 
@@ -13,45 +13,39 @@ namespace PipelineNodes
 void InferenceNode::execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx)
 {
     auto &p = static_cast<DeepLabPacket &>(packet);
-    auto &npu = static_cast<DeepLabNPUContext &>(ctx);
-
-    npu.bindToCurrentThread();
+    auto &npu = static_cast<InferContext &>(ctx);
 
     const size_t inputBytes = p.input_tensor.size() * sizeof(float);
-    const size_t outputBytes = p.output_tensor.size() * sizeof(float);
-    if (inputBytes > npu.getInputSize())
+    if (inputBytes != npu.getInputBufferSize())
     {
-        throw std::runtime_error("InferenceNode: input_tensor size exceeds model input buffer.");
-    }
-    if (outputBytes > npu.getOutputSize())
-    {
-        throw std::runtime_error("InferenceNode: output_tensor size exceeds model output buffer.");
+        throw std::runtime_error("InferenceNode: input_tensor size does not match model input buffer.");
     }
 
-    CHECK_ACL(
-        aclrtMemcpy(
-            npu.getDevBufIn(),
-            npu.getInputSize(),
-            p.input_tensor.data(),
-            inputBytes,
-            ACL_MEMCPY_HOST_TO_DEVICE),
-        "InferenceNode memcpy input");
+    if (npu.getNumOutputs() == 0)
+    {
+        throw std::runtime_error("InferenceNode: model has no outputs.");
+    }
 
-    CHECK_ACL(
-        aclmdlExecute(
-            npu.getModelId(),
-            npu.getInputDataset(),
-            npu.getOutputDataset()),
-        "InferenceNode aclmdlExecute");
+    npu.copyToDevice(p.input_tensor.data(), inputBytes);
+    npu.executeModel();
+    npu.copyToHost();
 
-    CHECK_ACL(
-        aclrtMemcpy(
-            p.output_tensor.data(),
-            outputBytes,
-            npu.getDevBufOut(),
-            outputBytes,
-            ACL_MEMCPY_DEVICE_TO_HOST),
-        "InferenceNode memcpy output");
+    const size_t outputBytes = npu.getOutputSize(0);
+    if (outputBytes % sizeof(float) != 0)
+    {
+        throw std::runtime_error("InferenceNode: output buffer size is not float-aligned.");
+    }
+
+    const size_t outputFloatCount = outputBytes / sizeof(float);
+    if (p.output_tensor.size() != outputFloatCount)
+    {
+        p.output_tensor.resize(outputFloatCount);
+    }
+
+    std::memcpy(
+        p.output_tensor.data(),
+        npu.getOutputHostBuffer(0),
+        outputBytes);
 
     LOG.debug("Packet %d: inference done", p.frame_id);
 }
