@@ -163,7 +163,6 @@ namespace GryFlux
 
         std::shared_ptr<GraphTemplate> template_;
         std::unordered_map<std::string, size_t> nodeIdToIndex_;
-        bool hasOutputNode_ = false;
     };
 
 } // namespace GryFlux

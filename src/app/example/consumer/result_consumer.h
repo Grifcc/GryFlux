@@ -64,11 +64,6 @@ public:
         }
     }
 
-    void consumeFailed(std::unique_ptr<GryFlux::DataPacket> packet) override
-    {
-        LOG.warning("Example consumer got failed packet id=%llu", static_cast<unsigned long long>(packet->getIdx()));
-    }
-
     // Statistics
     size_t getConsumedCount() const { return consumedCount_.load(std::memory_order_relaxed); }
 

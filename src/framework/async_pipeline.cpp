@@ -39,14 +39,14 @@ namespace GryFlux
 
     void AsyncPipeline::run()
     {
-        if (running_.load(std::memory_order_acquire))
+        if (running_)
         {
             LOG.warning("AsyncPipeline already running");
             return;
         }
 
-        running_.store(true, std::memory_order_release);
-        producerDone_.store(false, std::memory_order_release);
+        running_ = true;
+        producerDone_ = false;
 
         processor_->start();
 
@@ -67,20 +67,19 @@ namespace GryFlux
 
         processor_->stop();
 
-        running_.store(false, std::memory_order_release);
+        running_ = false;
         LOG.info("AsyncPipeline completed");
     }
 
     void AsyncPipeline::stop()
     {
-        if (!running_.load(std::memory_order_acquire))
+        if (!running_)
         {
             return;
         }
 
         LOG.info("Stopping AsyncPipeline...");
-        running_.store(false, std::memory_order_release);
-        source_->requestStop();
+        running_ = false;
 
         if (producerThread_.joinable())
         {
@@ -101,14 +100,14 @@ namespace GryFlux
 
         size_t producedCount = 0;
 
-        while (running_.load(std::memory_order_acquire) && source_->hasMore())
+        while (running_ && source_->hasMore())
         {
-            while (running_.load(std::memory_order_acquire) && processor_->getActivePacketCount() >= processor_->getMaxActivePackets())
+            while (running_ && processor_->getActivePacketCount() >= processor_->getMaxActivePackets())
             {
                 std::this_thread::yield();
             }
 
-            if (!running_.load(std::memory_order_acquire))
+            if (!running_)
             {
                 break;
             }
@@ -121,7 +120,7 @@ namespace GryFlux
             }
         }
 
-        producerDone_.store(true, std::memory_order_release);
+        producerDone_ = true;
         LOG.info("Producer thread completed, produced %zu packets", producedCount);
     }
 
@@ -131,17 +130,15 @@ namespace GryFlux
 
         size_t consumedCount = 0;
 
-        while (running_.load(std::memory_order_acquire))
+        while (running_)
         {
-            std::unique_ptr<DataPacket> packet;
-            const bool gotPacket = processor_->waitForOutput(packet, std::chrono::milliseconds(10));
+            auto packet = processor_->tryGetOutput();
 
-            if (gotPacket)
+            if (packet)
             {
                 if (packet->isFailed())
                 {
-                    LOG.warning("Forwarding failed packet id=%llu to DataConsumer", static_cast<unsigned long long>(packet->getIdx()));
-                    consumer_->consumeFailed(std::move(packet));
+                    LOG.warning("Dropping failed packet id=%llu", static_cast<unsigned long long>(packet->getIdx()));
                 }
                 else
                 {
@@ -151,10 +148,12 @@ namespace GryFlux
             }
             else
             {
-                if (producerDone_.load(std::memory_order_acquire) && processor_->getActivePacketCount() == 0)
+                if (producerDone_ && processor_->getActivePacketCount() == 0)
                 {
                     break;
                 }
+
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
         }
 

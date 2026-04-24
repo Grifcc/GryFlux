@@ -16,7 +16,6 @@
  *************************************************************************************************************************/
 #include "framework/template_builder.h"
 #include "utils/logger.h"
-#include <algorithm>
 #include <stdexcept>
 
 namespace GryFlux
@@ -25,10 +24,6 @@ namespace GryFlux
     TemplateBuilder::TemplateBuilder(std::shared_ptr<GraphTemplate> tmpl)
         : template_(tmpl)
     {
-        if (!template_)
-        {
-            throw std::invalid_argument("GraphTemplate is null");
-        }
     }
 
     void TemplateBuilder::setInputNode(const std::string &nodeId,
@@ -80,11 +75,6 @@ namespace GryFlux
             throw std::runtime_error("Node ID '" + nodeId + "' already exists");
         }
 
-        if (nodeId.empty())
-        {
-            throw std::runtime_error("Node ID cannot be empty");
-        }
-
         if (type == detail::NodeType::Input)
         {
             if (!template_->tasks_.empty())
@@ -95,24 +85,6 @@ namespace GryFlux
             {
                 throw std::runtime_error("Input node cannot have predecessors (nodeId='" + nodeId + "')");
             }
-        }
-        else if (template_->tasks_.empty())
-        {
-            throw std::runtime_error("Input node must be added before node '" + nodeId + "'");
-        }
-
-        if (hasOutputNode_)
-        {
-            throw std::runtime_error("Cannot add node '" + nodeId + "' after output node has been set");
-        }
-
-        if (type == detail::NodeType::Output)
-        {
-            if (predecessorIds.empty())
-            {
-                throw std::runtime_error("Output node must have at least one predecessor (nodeId='" + nodeId + "')");
-            }
-            hasOutputNode_ = true;
         }
 
         detail::TaskDef node;
@@ -130,13 +102,6 @@ namespace GryFlux
                 throw std::runtime_error("Predecessor node '" + predId + "' not found for node '" + nodeId + "'");
             }
             node.parentIndices.push_back(it->second);
-        }
-
-        std::sort(node.parentIndices.begin(), node.parentIndices.end());
-        auto duplicateIt = std::adjacent_find(node.parentIndices.begin(), node.parentIndices.end());
-        if (duplicateIt != node.parentIndices.end())
-        {
-            throw std::runtime_error("Duplicate predecessor found for node '" + nodeId + "'");
         }
 
         size_t index = template_->tasks_.size();
@@ -166,21 +131,6 @@ namespace GryFlux
 
     void TemplateBuilder::finalizeBuild()
     {
-        if (template_->tasks_.empty())
-        {
-            throw std::runtime_error("Graph template is empty");
-        }
-
-        if (template_->tasks_.front().type != detail::NodeType::Input)
-        {
-            throw std::runtime_error("Graph template must start with an input node");
-        }
-
-        if (!hasOutputNode_ || template_->tasks_.back().type != detail::NodeType::Output)
-        {
-            throw std::runtime_error("Graph template must end with exactly one output node");
-        }
-
         // 建立反向链接（后继节点）
         for (size_t i = 0; i < template_->tasks_.size(); ++i)
         {
