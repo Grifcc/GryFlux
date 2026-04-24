@@ -1,0 +1,6 @@
+3rdparty/*
+!3rdparty/README.md
+!3rdparty/.gitignore
+!3rdparty/models/
+!3rdparty/models/README.md
+!3rdparty/models/.gitignore
