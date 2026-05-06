@@ -8,13 +8,7 @@ void InferNode::execute(GryFlux::DataPacket &packet, GryFlux::Context &ctx) {
     auto& atlas_ctx = dynamic_cast<AtlasContext&>(ctx);
 
     const size_t input_size = dce_packet.input_tensor.size() * sizeof(float);
-    if (input_size != atlas_ctx.getInputBufferSize()) {
-        throw std::runtime_error("input tensor size mismatch");
-    }
-
-    atlas_ctx.copyToDevice(dce_packet.input_tensor.data(), input_size);
-    atlas_ctx.executeModel();
-    atlas_ctx.copyToHost();
+    atlas_ctx.run(dce_packet.input_tensor.data(), input_size);
 
     if (atlas_ctx.getNumOutputs() == 0) {
         throw std::runtime_error("model output count is zero");

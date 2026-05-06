@@ -1,81 +1,92 @@
 #include "ZeroDceResultConsumer.h"
-#include "../../packet/ZeroDce_Packet.h"
+
+#include <algorithm>
+#include <iomanip>
 #include <iostream>
 
-ZeroDceResultConsumer::ZeroDceResultConsumer(size_t total_frames) 
-    : total_frames_(total_frames), completed_frames_(0) {
-    start_time_ = std::chrono::high_resolution_clock::now();
-    results_log_.clear();
+ZeroDceResultConsumer::ZeroDceResultConsumer(size_t total_frames)
+    : total_frames_(total_frames),
+      start_time_(std::chrono::high_resolution_clock::now()) {
+    results_.reserve(total_frames_);
 }
 
 void ZeroDceResultConsumer::consume(std::unique_ptr<GryFlux::DataPacket> packet) {
     auto* dce_packet = dynamic_cast<ZeroDcePacket*>(packet.get());
-    if (dce_packet == nullptr) {
+    if (!dce_packet) {
         std::cerr << "[Consumer] 非法数据包，已跳过。" << std::endl;
         return;
     }
-    
-    results_log_.push_back({
-        dce_packet->image_name, 
-        dce_packet->int8_psnr, 
-        dce_packet->loss, 
+
+    results_.push_back({
+        dce_packet->frame_id,
+        dce_packet->image_name,
+        dce_packet->int8_psnr,
+        dce_packet->loss,
         dce_packet->status
     });
 
-    completed_frames_++;
-    std::cout << "\r[Consumer] 进度: " << completed_frames_ << " / " << total_frames_ << std::flush;
+    std::cout << "\r[Consumer] 进度: " << results_.size() << " / " << total_frames_ << std::flush;
 }
 
 void ZeroDceResultConsumer::printMetrics() {
-    if (results_log_.empty()) {
+    if (results_.empty()) {
         std::cout << "\n[INFO] 没有可输出的结果。" << std::endl;
         return;
     }
 
-    std::cout << "\n\n========================================================================\n";
-    std::cout << std::left 
-              << std::setw(15) << "Image" 
-              << "| " << std::setw(15) << "INT8 PSNR" 
-              << "| " << std::setw(15) << "Loss" 
-              << "| " << "Status\n";
-    std::cout << "========================================================================\n";
-
     double total_psnr = 0.0;
     double total_loss = 0.0;
+    std::sort(results_.begin(), results_.end(),
+              [](const ResultItem& lhs, const ResultItem& rhs) {
+                  return lhs.frame_id < rhs.frame_id;
+              });
+    std::cout << '\n';
+    std::cout << std::fixed << std::setprecision(2);
+    const std::string separator =
+        "==============================================================";
 
-    for (const auto& log : results_log_) {
-        std::cout << std::left 
-                  << std::setw(15) << std::get<0>(log) 
-                  << "| " << std::fixed << std::setprecision(2) << std::setw(15) << std::get<1>(log) 
-                  << "| " << std::fixed << std::setprecision(2) << std::setw(15) << std::get<2>(log) 
-                  << "| " << std::get<3>(log) << "\n";
-        
-        total_psnr += std::get<1>(log);
-        total_loss += std::get<2>(log);
+    std::cout << separator << '\n';
+    std::cout << std::left
+              << std::setw(14) << "Image"
+              << "| " << std::setw(11) << "INT8 PSNR"
+              << "| " << std::setw(9) << "Loss"
+              << "| " << std::setw(8) << "Status" << '\n';
+    std::cout << separator << '\n';
+
+    for (const auto& result : results_) {
+        std::cout << std::left
+                  << std::setw(14) << result.image_name
+                  << "| " << std::setw(11) << result.psnr
+                  << "| " << std::setw(9) << result.loss
+                  << "| " << std::setw(8) << result.status << '\n';
+        total_psnr += result.psnr;
+        total_loss += result.loss;
     }
-
-    size_t count = completed_frames_ > 0 ? static_cast<size_t>(completed_frames_) : 1;
-    std::cout << "========================================================================\n";
-    std::cout << std::left 
-              << std::setw(15) << "Average" 
-              << "| " << std::fixed << std::setprecision(2) << std::setw(15) << (total_psnr / count) 
-              << "| " << std::fixed << std::setprecision(2) << std::setw(15) << (total_loss / count) 
-              << "|\n";
-    std::cout << "========================================================================\n\n";
 
     auto end_time = std::chrono::high_resolution_clock::now();
-    double total_time_ms = std::chrono::duration<double, std::milli>(end_time - start_time_).count();
-    double fps = total_time_ms > 0.0 ? (completed_frames_ * 1000.0) / total_time_ms : 0.0;
+    const double total_time_ms =
+        std::chrono::duration<double, std::milli>(end_time - start_time_).count();
+    const size_t count = results_.size();
+    const double avg_psnr = total_psnr / static_cast<double>(count);
+    const double avg_loss = total_loss / static_cast<double>(count);
 
-    std::cout << "[INFO] 处理完成，共 " << completed_frames_ << " 张图片\n";
-    std::cout << "   - 处理总数: " << completed_frames_ << " 张\n";
-    std::cout << "   - 总计耗时: " << total_time_ms << " ms\n";
+    std::cout << separator << '\n';
+    std::cout << std::left
+              << std::setw(14) << "Average"
+              << "| " << std::setw(11) << avg_psnr
+              << "| " << std::setw(9) << avg_loss
+              << "| " << std::setw(8) << "" << '\n';
+    std::cout << separator << "\n\n";
+
+    std::cout << "[INFO] 处理完成，共 " << count << " 张图片\n";
+    std::cout << "  - 处理总数: " << count << " 张\n";
+    std::cout << "  - 总计耗时: " << total_time_ms << " ms\n";
     if (total_time_ms > 0.0) {
-        std::cout << "   - 端到端 FPS: " << std::fixed << std::setprecision(4) << fps << " FPS\n";
-    } else {
-        std::cout << "   - 端到端 FPS: 无法计算（耗时为 0）\n";
+        const double fps = (count * 1000.0) / total_time_ms;
+        std::cout << "  - 端到端 FPS: " << std::setprecision(4) << fps << " FPS\n";
+        std::cout << std::setprecision(2);
     }
-    std::cout << "========================================================================\n";
+    std::cout << separator << '\n';
 
-    results_log_.clear();
+    results_.clear();
 }

@@ -1,11 +1,11 @@
 #pragma once
-#include <atomic>
 #include <chrono>
-#include <iomanip>
+#include <cstddef>
+#include <memory>
 #include <string>
-#include <tuple>
-#include "framework/data_consumer.h"
 #include <vector>
+
+#include "framework/data_consumer.h"
 #include "../../packet/ZeroDce_Packet.h"
 
 class ZeroDceResultConsumer : public GryFlux::DataConsumer {
@@ -18,9 +18,15 @@ public:
     void printMetrics();
 
 private:
-    size_t total_frames_;
-    std::atomic<size_t> completed_frames_{0};
-    std::vector<std::tuple<std::string, double, double, std::string>> results_log_;
+    struct ResultItem {
+        size_t frame_id;
+        std::string image_name;
+        double psnr;
+        double loss;
+        std::string status;
+    };
 
+    const size_t total_frames_;
+    std::vector<ResultItem> results_;
     std::chrono::time_point<std::chrono::high_resolution_clock> start_time_;
 };

@@ -12,31 +12,16 @@
 
 class AtlasContext : public GryFlux::Context {
 public:
-    struct Config {
-        std::string model_path;
-        int device_id = 0;
-    };
-
-    explicit AtlasContext(Config config);
+    AtlasContext(std::string model_path, int device_id);
     ~AtlasContext() override;
 
     bool init(std::string* error);
 
-    const Config& config() const { return config_; }
     int getDeviceId() const { return device_id_; }
-
-    size_t getNumInputs() const { return input_buffers_.size(); }
-    size_t getInputBufferSize(size_t index) const;
-    size_t getInputBufferSize() const;
-
-    void copyToDevice(const void* host_data, size_t size);
-    void copyToDevice(size_t input_index, const void* host_data, size_t size);
-    void executeModel();
-    void copyToHost();
-    void copyToHost(size_t output_index, void* host_buffer, size_t size);
+    void run(const void* input_data, size_t input_size);
 
     size_t getNumOutputs() const { return output_buffers_.size(); }
-    void* getOutputHostBuffer(size_t index) const;
+    const void* getOutputHostBuffer(size_t index) const;
     size_t getOutputSize(size_t index) const;
 
 private:
@@ -51,13 +36,22 @@ private:
         size_t size = 0;
     };
 
+    void setDevice() const;
+    void loadModel();
+    void createInputBuffers();
+    void createOutputBuffers();
+
+    const ModelOutput& outputBuffer(size_t index) const;
+    void cleanup() noexcept;
     void destroyDatasets() noexcept;
     void destroyBuffers() noexcept;
     void unloadModel() noexcept;
 
-    Config config_;
-    bool initialized_ = false;
+    std::string model_path_;
     int device_id_ = 0;
+    bool acl_ready_ = false;
+    bool initialized_ = false;
+    bool model_loaded_ = false;
 
     uint32_t model_id_ = 0;
     aclmdlDesc* model_desc_ = nullptr;

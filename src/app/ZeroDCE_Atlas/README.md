@@ -87,11 +87,8 @@
 
 位于 `nodes/Infer/InferNode.cpp`，当前逻辑是：
 
-- 从 `AtlasContext` 获取输入 buffer 大小
-- 检查 `input_tensor` 字节数是否与模型输入大小一致
-- 调用 `copyToDevice()`
-- 调用 `executeModel()`
-- 调用 `copyToHost()`
+- 将 `input_tensor` 作为 host 输入传给 `AtlasContext::run()`
+- 在 `run()` 内部完成输入拷贝、模型执行和输出回传
 - 把第一个输出复制到 `packet.host_output_buffer`
 
 这里不再为每个 packet 临时创建 dataset 和 device buffer，而是复用 `AtlasContext` 中预先分配好的 ACL 资源。
@@ -123,6 +120,7 @@
 
 位于 `context/AtlasContext.h/.cpp`，负责封装单个 Atlas 推理资源。当前会在初始化时完成：
 
+- 整体实现思路参考 `ct/OmModelRunner`，但这里保留的是更贴合当前示例的简化版：复用模型、dataset 和输入输出 buffer，不再暴露通用的 stage / stream 抽象
 - 加载 OM 模型
 - 创建 `model_desc`
 - 为每个输入分配 device buffer 和 input dataset
@@ -130,9 +128,7 @@
 
 运行时 `InferNode` 直接调用：
 
-- `copyToDevice()`
-- `executeModel()`
-- `copyToHost()`
+- `run()`
 
 #### `ResourcePool`
 
@@ -216,6 +212,14 @@ build/src/app/ZeroDCE_Atlas/zero_dce_app
 
 ### 运行
 
+运行前请先加载 Ascend 环境变量，例如：
+
+```bash
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+```
+
+然后在仓库根目录执行：
+
 ```bash
 ./install/bin/zero_dce_app <om_model_path> <input_dir> <output_dir>
 ```
@@ -231,7 +235,7 @@ build/src/app/ZeroDCE_Atlas/zero_dce_app
 当前运行结束后，`ZeroDceResultConsumer` 会打印：
 
 - 实时处理进度
-- 每张图的 `INT8 PSNR / Loss / Status`
+- 按 `frame_id` 排序的结果表格
 - 平均 `PSNR / Loss`
 - 总耗时
 - 端到端 FPS
@@ -252,12 +256,29 @@ bash build.sh --enable_profile
 pipeline.setProfilingEnabled(true);
 ```
 
-但当前这个示例已经不再主动：
+但当前这个示例仍然没有主动：
 
 - 打印 profiling summary
-- 导出 timeline JSON
 
-所以即使使用 `--enable_profile` 构建，当前 `zero_dce_app` 也不会默认输出 profiling 统计信息。
+不过在启用 profiling 的构建下，程序会在 `pipeline.run()` 结束后自动导出：
+
+```cpp
+graph_timeline_zero_dce.json
+```
+
+导出位置是可执行文件所在目录：
+
+```bash
+install/bin/graph_timeline_zero_dce.json
+```
+
+如果你直接运行构建目录下的目标文件，则通常位于：
+
+```bash
+build/src/app/ZeroDCE_Atlas/graph_timeline_zero_dce.json
+```
+
+当前目录下附带的 `assets/timeline_zero_dce.png` 是一张近似当前实现量级的示意图，用来展示当前 DAG 在双 `AtlasContext` 资源下的典型并行节奏，不是程序运行时自动生成的实测产物。
 
 ## 当前限制
 

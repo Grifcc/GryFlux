@@ -1,4 +1,6 @@
 #include "AsyncDiskWriter.h"
+
+#include <filesystem>
 #include <iostream>
 
 AsyncDiskWriter& AsyncDiskWriter::GetInstance() {
@@ -7,41 +9,46 @@ AsyncDiskWriter& AsyncDiskWriter::GetInstance() {
 }
 
 void AsyncDiskWriter::Start(const std::string& output_dir) {
+    std::lock_guard<std::mutex> lock(mtx_);
     output_dir_ = output_dir;
-    is_running_ = true;
-    worker_thread_ = std::thread(&AsyncDiskWriter::ProcessQueue, this);
+
+    if (output_dir_.empty()) {
+        std::cerr << "[WARN] 输出目录为空，后续图片不会写盘。" << std::endl;
+        return;
+    }
+
+    std::error_code ec;
+    std::filesystem::create_directories(output_dir_, ec);
+    if (ec) {
+        std::cerr << "[WARN] 创建输出目录失败: " << output_dir_
+                  << ", error: " << ec.message() << std::endl;
+    }
 }
 
 void AsyncDiskWriter::Stop() {
-    is_running_ = false;
-    cv_.notify_all();
-    if (worker_thread_.joinable()) {
-        worker_thread_.join();
-    }
+    std::lock_guard<std::mutex> lock(mtx_);
+    output_dir_.clear();
 }
 
 void AsyncDiskWriter::Push(uint64_t frame_id, const cv::Mat& img) {
+    if (img.empty()) {
+        std::cerr << "[WARN] 跳过空图像，frame_id=" << frame_id << std::endl;
+        return;
+    }
+
+    std::string output_dir;
     {
         std::lock_guard<std::mutex> lock(mtx_);
-        task_queue_.push({frame_id, img.clone()}); 
+        output_dir = output_dir_;
     }
-    cv_.notify_one(); 
-}
 
-void AsyncDiskWriter::ProcessQueue() {
-    while (true) {
-        Task task;
-        {
-            std::unique_lock<std::mutex> lock(mtx_);
-            cv_.wait(lock, [this] { return !task_queue_.empty() || !is_running_; });
-            
-            if (!is_running_ && task_queue_.empty()) break;
-            
-            task = task_queue_.front();
-            task_queue_.pop();
-        }
+    if (output_dir.empty()) {
+        std::cerr << "[WARN] 输出目录未初始化，跳过写盘，frame_id=" << frame_id << std::endl;
+        return;
+    }
 
-        std::string filename = output_dir_ + "/frame_" + std::to_string(task.frame_id) + ".jpg";
-        cv::imwrite(filename, task.img);
+    const std::string filename = output_dir + "/frame_" + std::to_string(frame_id) + ".jpg";
+    if (!cv::imwrite(filename, img)) {
+        std::cerr << "[WARN] 写盘失败: " << filename << std::endl;
     }
 }
